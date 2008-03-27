@@ -1,0 +1,740 @@
+uses "cmail.lib";
+uses "array";
+uses "cmime";
+uses "regexp";
+uses "string";
+uses "iconv";
+
+module-header {
+	#include "imap_utility.h"
+	#include <imap/linkage.h>
+
+	#include <imap/c-client.h>
+	extern char *curhst;
+	extern char *curusr;
+	extern char *global_pwd;
+	#define SelfObj ((MAILSTREAM*)(self->odata))
+}
+
+
+/**
+ * !namespace Mail
+ * !brief Classes for connections and messages
+ */
+
+namespace Mail {
+
+	string defaultEncodingTarget = "UTF-8";
+	
+     /**
+       * !function fixISOString
+       * !brief Convert quoted printable iso string
+       * !return string
+       */
+    function fixISOString(string str, number dontuse) 
+		return self.fixISOString(str );
+    
+
+	function convertToUTF8From( string content, string type ) {
+	    object convertor = null;
+
+	    monitor {
+			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : 'ISO-8859-1'));
+	    } handle {
+			type = ""; //no convertion beacasue we have no convertor..... :/
+	    }
+		if( not type ) {
+			Console.println("module.mail: No charset requested, defaulting to ISO-8859-1");
+		}
+		if( not (type.toLower() == 'utf-8') or (type.toLower() == 'utf8') ) {
+			monitor {
+				return convertor.convert(content);
+			} handle {
+				if( [ 'us-ascii' ].valueExists(type.toLower()) ) {
+					Console.println("module.module: $type failed, trying ISO-8859-1");
+					return .convertToUTF8From( content, 'ISO-8859-1' );
+				}
+				Console.println("module.mail: Error Converting from $type to ${Mail.defaultEncodingTarget}");
+				return content;
+			}
+		}
+		return content;
+	}
+	function canFixISOString( string str ) {
+		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
+		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
+
+		str = Regexp.replaceAll( '_', str, ' ' );
+		str = Regexp.replaceAll( '\n', str, '' );
+
+		if( o.match( str ) or o2.match( str ) ) {
+			return true;
+		}
+		return false;
+	}
+	function fixISOString( string str ) {
+		string nstr;
+		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
+		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
+		number currentIndex = 0;
+
+		str = Regexp.replaceAll( '_', str, ' ' );
+		str = Regexp.replaceAll( '\n', str, '' );
+
+		if( o.match( str ) ) {
+			o.matchAll( str ) using ( match ) {
+				if( match.span()[0] != currentIndex )
+					nstr += str[currentIndex..(match.span()[0]-1)];
+
+				if( String.compareNoCase(match.capture(1), "q") )
+					nstr += .convertToUTF8From(Mail.Connection.qprint( match.capture(2) ), match.capture(0));
+				else if( String.compareNoCase( match.capture(1), "b") )
+					nstr += .convertToUTF8From(Mail.Connection.base64( match.capture(2) ), match.capture(0));
+				else
+					nstr += .convertToUTF8From(match.capture(2), match,capture(0));
+
+				currentIndex = match.span()[1];
+			};
+
+			if( currentIndex < String.length(str) )
+				nstr += str[currentIndex..];
+
+			return nstr;
+		}
+		else if( o2.match( str ) ) {
+			object match = o2.match( str );
+			str = Regexp.replaceAll( '%', str, '=' );
+			return .convertToUTF8From(Mail.Connection.qprint(match.capture(1)),match.capture(0));
+		}
+		return str;
+	}
+	/**
+	 * !function strip_html
+	 * !declaration function strip_html( string html )
+	 * !brief remove html tags from string
+	 * !return string
+	 */	
+	function stripHTML( string html ) {
+	    number i = 0;
+	    string result; 
+	    array entities = [ ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"] ];
+
+	    object regex = new Regexp("<br ?.*?>", "gxi");
+	    html = regex.replaceAll(html, "\n");
+
+	    result = self.strip_tags(html);
+	    if(result != html ) {
+			for(i = 0; i < Array.size(entities); i++) {
+			    regex = new Regexp("(&" + entities[i][0] + ";)", "igx");
+			    result = regex.replaceAll(result, entities[i][1]);
+			}
+	    }
+	    return result;
+	}
+
+	native function stripTags(string html) {
+	    return strip_tags(script, html->data, html->length);
+	}
+	
+
+	/**
+	 * !Class Connection
+	 * !brief Class for connection and issuing commands to mail servers ( pop,imap,mbox, SMTP )
+	 */
+	
+	class Connection
+	{
+		string _errstr;
+		string account_type; 
+
+		/**
+		 * !function connection
+		 * !brief constructor
+		 */
+
+		native function constructor() {
+			self->odata = NULL;
+			//set timeout.
+			mail_parameters(NIL, SET_OPENTIMEOUT, (void *)20);
+			mail_parameters(NIL, SET_READTIMEOUT, (void *)10);
+			mail_parameters(NIL, SET_WRITETIMEOUT, (void *)10);
+			mail_parameters(NIL, SET_CLOSETIMEOUT, (void *)10);
+			//set number of login tries.
+			mail_parameters(NIL, SET_MAXLOGINTRIALS, (void *)2);
+
+			//mail_parameters(NIL, SET_TRYSSLFIRST, (void *)T);
+			//mail_parameters(NIL, SET_IMAPTRYSSL, (void *)NIL);
+		}
+		
+		function setAccountType(string type) 
+		    self.account_type = type;
+
+		function errstr() {
+			return ._errstr;
+		}
+
+		static native function qprint( string str ) {
+			FeriteVariable *v;	
+			char *nstr;
+			unsigned long len2;
+			//fprintf(stderr, "str = %s, len = %d", str->data, str->length);
+			nstr = rfc822_qprint( str->data , str->length, &len2 );
+			//fprintf(stderr, "New string=%s len2 = %d", nstr, len2);
+			v = fe_new_str( "qprint", nstr, len2, FE_CHARSET_DEFAULT );
+			FE_RETURN_VAR( v );
+		}
+
+		static native function base64( string str ) {
+			FeriteVariable *v;	
+			char *nstr;
+			unsigned long len2;
+			//fprintf(stderr, "str = %s, len = %d", str->data, str->length);
+			nstr = rfc822_base64( str->data , str->length, &len2 );
+			//fprintf(stderr, "New string=%s len2 = %d", nstr, len2);
+			v = fe_new_str( "base64", nstr, len2, FE_CHARSET_DEFAULT );
+			FE_RETURN_VAR( v );
+		}
+		static native function bit8( string str ) {
+			FeriteVariable *v;	
+			char *nstr;
+			unsigned long len2;
+			//fprintf(stderr, "str = %s, len = %d", str->data, str->length);
+			nstr = rfc822_8bit( str->data , str->length, &len2 );
+			//fprintf(stderr, "New string=%s len2 = %d", nstr, len2);
+			v = fe_new_str( "8bit", nstr, len2, FE_CHARSET_DEFAULT );
+			FE_RETURN_VAR( v );
+		}
+
+		//change to (server,servertype,  user, password )??
+		/**
+		 * !function openMailbox
+		 * !param string server/user
+		 * !param string password
+		 * !declaration native function open_mbox( string mbox, string passwd )
+		 * !brief Connect to mailserver ( POP3,IMAP, or local mbox )
+		 * !description  example: conn.openMailbox( "{Mail.mydomain.com:110/pop3/user=\"username\"}" , "mypass" ); 
+		 * !return number success ( bool )
+		 */
+
+		function openMailbox( string proto, string host, number port, string username, string password ) {
+			return .openMailbox( "{$host:$port/$proto/user=\"$username\"}", password );
+		}
+		native function openMailbox( string mbox, string passwd ) {
+			char data[1024];
+                        #include "imap/linkage.c" 
+			global_pwd = passwd->data;
+
+			self->odata = mail_open( SelfObj, mbox->data, 0);
+			if( SelfObj == NULL ) {
+				set_error_string( script, self, "Unable to open mailbox" );
+				FE_RETURN_FALSE;
+			}
+			FE_RETURN_TRUE;
+		}
+
+		/**
+		 * !function close_mbox
+		 * !declaration native function close_mbox( )
+		 * !brief disconnect from server 
+		 */
+
+		native function closeMailbox( ) {
+			if( SelfObj ) {
+				mail_close( SelfObj );
+			}
+			self->odata = NULL;
+		}
+		
+		/**
+		 * !function messageCount
+		 * !declaration native function messageCount()
+		 * !brief get number of messages in mailbox
+		 * !return number 
+		 */
+
+		native function messageCount( ) {
+			FE_RETURN_LONG( SelfObj->nmsgs );
+		}
+
+		/**
+		 * !function mailAtIndex
+		 * !declaration native mailAtIndex( number n )
+		 * !brief get mail #n
+		 * !return object of class mailobj
+		 */
+
+		native function messageAtIndex( number n ) {
+			ENVELOPE *env = NULL;
+			BODY *body = NULL;
+			FeriteVariable *header = NULL, *content = NULL, *mail = NULL;
+			
+			if( (long)n < 1 || (long)n > SelfObj->nmsgs ) {
+				set_error_string( script, self, "Message number out of bounds" );
+				FE_RETURN_NULL_OBJECT;
+			}
+
+			env = mail_fetchstructure_full( SelfObj, n, &body, NIL );
+
+			header = create_ferite_header_object( script, env );
+			if( header == NULL ) {
+				set_error_string( script, self, "Couldn't create header" );
+				FE_RETURN_NULL_OBJECT;
+			}
+
+			content = create_ferite_content_object( script, SelfObj, body, (long)n, NULL );
+			if( content == NULL ) {
+				set_error_string( script, self, "Couldn't create body" );
+				FE_RETURN_NULL_OBJECT;
+			}
+
+			mail = create_ferite_mail_object( script, header, content );
+			if( mail == NULL ) {
+				set_error_string( script, self, "Internal error" );
+				FE_RETURN_NULL_OBJECT;
+			}
+			
+			FE_RETURN_VAR( mail );
+		}
+		native function messageHeaderAtIndex( number n ) {
+			ENVELOPE *env = NULL;
+			BODY *body = NULL;
+			FeriteVariable *header = NULL, *content = NULL, *mail = NULL;
+			
+			if( (long)n < 1 || (long)n > SelfObj->nmsgs ) {
+				set_error_string( script, self, "Message number out of bounds" );
+				FE_RETURN_NULL_OBJECT;
+			}
+
+			env = mail_fetchenvelope( SelfObj, n );
+
+			header = create_ferite_header_object( script, env );
+			if( header == NULL ) {
+				set_error_string( script, self, "Couldn't create header" );
+				FE_RETURN_NULL_OBJECT;
+			}
+
+			mail = create_ferite_mail_object( script, header, content );
+			if( mail == NULL ) {
+				set_error_string( script, self, "Internal error" );
+				FE_RETURN_NULL_OBJECT;
+			}
+			
+			FE_RETURN_VAR( mail );
+		}
+
+		/**
+		 * !function sendMail
+		 * !declaration native sendMail( string server, object mail )
+		 * !brief Connect to a SMTP server and send a mail
+		 * !param string server
+		 * !param object mail
+		 * !return number success true/false
+		 * !description connect to an SMTP server and send a mail
+		          example: conn.sendMail( "Mail.mydomain.com", myMail );
+		 */
+	
+		native function sendMessage( string server, object mailet ) {
+			FeriteVariable *content, *header;
+			ENVELOPE *env;
+			BODY *body;
+			SENDSTREAM *stream;
+
+			char *hostlist[] = { server->data, NIL };
+			
+			header  = ferite_hash_get(script,mailet->variables->variables,"header");
+			content = ferite_hash_get(script,mailet->variables->variables,"content");
+			if(! ( header && content ) ) {
+				printf("internal error\n");
+				FE_RETURN_FALSE;
+			}
+			
+			body = create_imap_content_object(script, content);
+			if ( body == NULL ) {
+				set_error_string( script, self, "Couldn't create body" );
+				FE_RETURN_FALSE;
+			}
+
+			env = create_imap_envelope( script, header );
+			if ( env == NULL ) {
+				set_error_string( script, self, "Couldn't create header" );
+				FE_RETURN_FALSE;
+			}
+
+			stream = smtp_open( hostlist, 0); //SOP_TRYSSL
+ 
+			if( stream == NULL ) {
+				set_error_string( script, self,"Error  opening SMTP stream" );
+				FE_RETURN_FALSE;
+			}
+
+	
+			if( smtp_mail( stream, "MAIL", env, body ) == NIL ) {
+				set_error_string( script, self,"SMTP Error" );
+				FE_RETURN_FALSE;
+			}
+			smtp_close( stream );
+			FE_RETURN_TRUE;
+		}
+		
+		
+		/**
+		 * !function delete_marked 
+		 * !declaration native delete_marked 
+		 * !brief Connect to a SMTP server and send a mail
+		 * !return number success true/false
+		 */
+		native function expungeMessages() {
+			mail_expunge( SelfObj );
+		}
+		
+		/**
+		 * !function set_delete_flag
+		 * !declaration native function set_delete_flag( number n )
+		 * !param 
+		 * !brief mark mail #n to be deleted
+		 */
+
+		native function flagMessageDeleted( number n ) {
+			char str[9];
+			if( n > 0 && n < 100000000) { 
+				sprintf (str,"%lu",(long)n);
+				mail_setflag_full(SelfObj, str, "\\DELETED", NIL);
+			}
+		}
+
+		native function flagMessageSeen( number n ) {
+			char str[7];
+			if( n > 0 && n < 100000000) { 
+				sprintf(str,"%lu",(long)n);
+				mail_setflag_full(SelfObj,str,"\\SEEN", NIL);
+			}
+		}
+
+		native function messageBeenSeen( number n ) {
+		    MESSAGECACHE *elt;
+		    if( n > 0 && n < 100000000) {
+				elt  = mail_elt(SelfObj, n);
+				if( elt->seen ) { // elt->recent)
+			    	FE_RETURN_TRUE;
+				}
+		    }
+		    FE_RETURN_FALSE;
+		}
+	}
+	/**
+	 *!end
+	 */
+
+	
+	/** 
+	* !class mailobj
+        * !brief Container for header and content
+	*/
+ 	class Message
+	{
+		/**
+		 * !variable object header
+		 * !brief object of class header
+		 */
+		object header;
+        /**
+		 * !variable object content 
+		 * !brief object of class Mail.part OR Mail.multipart
+		 */
+		object content;
+
+		function constructor(){
+			self.header = new Mail.MessageHeader();
+		}
+		
+		function getSubject() {
+			string subject = (.header.subject ? .header.subject : '');
+			if( subject ){
+				if( Mail.canFixISOString(subject) ) {
+					subject = Mail.fixISOString(subject);
+				} else if( .content ) {
+					subject = Mail.convertToUTF8From( subject, .guessMainCharacterSet() );
+				}
+			}
+			return subject;
+		}
+		function guessMainCharacterSet() {
+			return .content.characterSet();
+		}
+		/**
+		 * !function attachmentList
+		 * !declaration function attachmentList()
+		 * !brief Get an array of attached files
+		 * !return array of part objects
+		 */		
+		function attachmentList() {
+			return self.content.attachmentList();
+		}
+		
+		/**
+		 * !function get_msg_text
+		 * !declaration function get_msg_text()
+		 * !brief get mail content as plaintext
+		 * !return string
+		 */	
+		
+		function asText()
+			return Mail.stripTags(self.content.toMessage( false ));
+		
+		/**
+		 * !function asHTML
+		 * !declaration function asHTML()
+		 * !brief get mail content as html 
+		 * !return string
+		 */
+		function asHTML()
+			return self.content.toMessage( true );
+	}
+	/**
+	 * !end
+	 */
+	
+
+	/**
+	 * !class address
+	 * !brief class for mailaddresses
+	 */
+	
+	class Address {
+		
+        /** 
+		 * !function address
+		 * !brief Constructor
+		 * !param string milbox
+		 * !param string host
+		 */
+		function constructor( string mailbox, string host ){
+			self.mailbox = mailbox;
+			self.host = host;
+		}
+		function constructor( string addr ) {
+			array hits;
+			object result;
+			object regex = new Regexp("(.*?)\@(.*)", "i");
+
+			result = regex.match( addr );
+			hits = result.captures();
+
+			if( hits && hits[0] && hits[1] ) {
+				self.mailbox = hits[0];
+				self.host = hits[1];
+			}
+			raise new Error("Invalid email address passed to Mail.Address constructor");
+		}
+
+		string mailbox;
+		string host;
+		string name;
+		
+		function flatAddress()
+			return "${.mailbox}@${.host}";
+	}
+	
+	/**
+	  * !end
+	  */
+	
+
+	
+	/**
+	 * !class AddressList
+	 * !brief container for addresses
+	 */
+
+	class AddressList {
+		array list;
+
+		/**
+		 * !function add
+		 * !brief add an addressobject to the list
+		 * !param object address
+		 */
+
+		function add(object address){
+			Array.push( self.list, address );
+		}
+		/**
+		 * !function flatAddresses
+		 * !brief get a list of strings
+		 * !return array 
+		 */
+		function flatAddresses() {
+			array list = [];
+			.list.each() using ( address ) {
+				list[] = "${address.mailbox}@${address.host}";
+			};
+			return list;
+		}
+	}
+	/**
+	 * !end
+	 */
+	
+	/**
+	 * !class mail_header
+	 * !brief class for header fields
+	 */
+	class MessageHeader {
+		object to;
+		object cc;
+		object bcc;
+		object reply_to;
+		object from;
+		object sender;
+		
+		string ID;
+		string in_reply_to;
+		string date;
+		string recieved;
+		string subject;
+
+		
+		/**
+		 * !function mail_header()
+		 * !brief constructor
+		 */
+
+		function constructor(){
+			self.to = new Mail.AddressList();
+			self.from = new Mail.AddressList();
+			self.bcc = new Mail.AddressList();
+			self.reply_to  = new Mail.AddressList();
+			self.cc = new Mail.AddressList();
+			self.sender = new Mail.AddressList();
+		}	
+	}
+	/**
+ 	* !end		
+ 	*/
+
+	/**
+	 * !class multipart
+	 * !brief a container for parts
+	 */
+	class MessageMultiPart
+	{
+		array  parts;
+		number nparts;
+		number type;
+		string subtype;
+		
+		function constructor(){
+			self.type = Mime.TYPEMULTIPART;
+		}
+		
+		function isMultipart(){
+			return true;
+		}
+		
+		function addPart(object sub) {
+			Array.push(self.parts,sub);
+		}
+		
+		function characterSet() {
+			string set = '';
+			.parts.each() using ( part ) {
+				set = part.characterSet();
+				if( set )
+					return false;
+			};
+			return set;
+		}
+		
+		function addAttachment(string path){
+		    object regex;
+		    object match;
+			//Fixme check that file is readable
+			object part = new Mail.MessagePart();
+			part.filepath = path;
+			part.type = Mime.TYPEAPPLICATION;
+			part.subtype = "octet-stream";
+			part.encoding = Encoding.ENCBINARY;
+
+			regex = new Regexp(".*/([^/]+*)$");
+			if( (match = regexp.match(path)) )
+				part.filename = match.match();
+			else
+				part.filename = path; 
+			Array.push(self.parts,part);
+		}
+		
+		function toMessage( boolean wantHTML ) {
+			return .parts.join('') using ( part ) {
+				return part.toMessage( wantHTML );
+			};
+		}
+		function attachmentList() {
+			array list = [];
+			.parts.each() using ( part ) {
+				array subList = part.attachmentList();
+				subList.each() using ( subpart ) {
+					list[] = subpart;
+				};
+			};
+			return list;
+		}
+	}
+
+	
+	/**
+	 * !class part
+	 * !brief a content leaf on mailobj
+	 */
+
+	class MessagePart
+	{
+		number type;
+		string subtype;
+		number encoding;
+		string content;
+		string charset;
+		string filename;
+		string filepath;
+		
+		function constructor( ) {
+			self.type = Mime.TYPETEXT;
+		}
+		
+		function save(string path){
+			return -1;
+		}
+		
+		function isMultipart() {
+			return false;
+		}
+		
+		function characterSet() {
+			return .charset;
+		}
+		function toMessage( boolean wantHTML ){
+			if( .filename ) {
+				return "[${Mime.toString(.type)}/${.subtype}:${Mail.fixISOString(.filename)}]";
+			} else if( .type == Mime.TYPETEXT and ['plain', 'html'].valueExists(.subtype.toLower()) ) {
+				boolean containsHTML = String.compareNoCase(.subtype, "HTML");
+				string  content = .content;
+				/* Process the content */
+				/*  - Keep email addresses */
+			    content = Regexp.replaceAll('<(.*@.*?)>', content, '\1');
+				/*  - Convert the text to UTF-8 */
+			    content = Mail.convertToUTF8From( content, .charset );
+				if( (containsHTML and not wantHTML) ) {
+					content = Mail.stripHTML( content );
+				}
+				return content;
+			}
+		}
+		
+		function attachmentList() {
+		 	if( .filename ) {
+				.filename = Mail.fixISOString(.filename);
+				return [ self ];
+			}
+			return [];
+		}
+	}	
+}

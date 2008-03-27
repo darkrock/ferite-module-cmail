@@ -1,0 +1,31 @@
+uses "cmail";
+uses "console";
+
+object message = new Mail.Message();
+object connection = new Mail.Connection();
+object content = new Mail.MessagePart();
+
+
+object to = new Mail.Address("chris","darkrock.co.uk");
+object from = new Mail.Address("chris","darkrock.co.uk");
+from.name = "Chris Ross";
+
+
+message.header = new Mail.MessageHeader();
+message.header.to.add( to );
+message.header.from.add( from );
+message.header.subject = "This is a test message";
+
+content.type = Mime.TYPETEXT;
+content.subtype = "plain";
+content.content = "
+欧洲，软件＋互联网
+用统一码 (Unicode) 走遍世界
+将于1997年 3 月10日－12日在德国 Mainz 市举行的第十届统一码国际研讨会现在开始注册。 本次会议将汇集各方面的专家。 涉及的领域包括： 国际互联网和统一码 ，国际化和本地化 ，统一码在操作系统和应用软件中的实现 ，字型 ，文本格式以及多文种计算等。
+当世界需要沟通时，请用Unicode！
+";
+content.charset = "UTF-8";
+
+message.content = content;
+
+connection.sendMessage( "relay.plus.net", message );
