@@ -88,11 +88,11 @@ FeriteVariable *create_address_list(FeriteScript *script, ADDRESS *root) {
 
 FeriteVariable *create_ferite_header_object( FeriteScript *script, ENVELOPE *env )
 {
-    FeriteVariable *header, *v;
-    FeriteNamespaceBucket *nsb;
+    FeriteVariable *header = NULL, *v = NULL;
+    FeriteNamespaceBucket *nsb = NULL;
     #define BUFSIZE 1025
     char buf[BUFSIZE];
-    int i;
+    int i = 0;
 
     if( env == NULL)
       return NULL;
@@ -157,126 +157,129 @@ int caseless_compare( char *str1, char *str2 )
 }
 FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *stream, BODY *body, int msgno, char *sec )
 {
-	FeriteVariable *object = NULL,*v = NULL;
-	FeriteNamespaceBucket *nsb = NULL;
-	char *object_name = NULL;
+	if( body != NULL ) {
+		FeriteVariable *object = NULL,*v = NULL;
+		FeriteNamespaceBucket *nsb = NULL;
+		char *object_name = NULL;
 
-	object_name = ( body->type == TYPEMULTIPART ) ? "Mail.MessageMultiPart" : "Mail.MessagePart" ;
+		object_name = ( body->type == TYPEMULTIPART ) ? "Mail.MessageMultiPart" : "Mail.MessagePart" ;
 
-	nsb = ferite_find_namespace( script, script->mainns, object_name , FENS_CLS );
-	if( nsb == NULL )
-		return NULL;
-	object = ferite_build_object( script, (FeriteClass *)nsb->data );
-	if( object == NULL )
-		return NULL;
+		nsb = ferite_find_namespace( script, script->mainns, object_name , FENS_CLS );
+		if( nsb == NULL )
+			return NULL;
+		object = ferite_build_object( script, (FeriteClass *)nsb->data );
+		if( object == NULL )
+			return NULL;
 
-	v  = fe_new_lng("type",body->type);
-	ferite_object_set_var(script, VAO(object), "type", v);
-	//printf("module.mail: setting type %d\n", body->type);
-	if( body->subtype ) {
-		v = fe_new_str( "subtype", body->subtype, 0, FE_CHARSET_DEFAULT );
-		ferite_object_set_var( script, VAO(object), "subtype", v );
-	}
+		v  = fe_new_lng("type",body->type);
+		ferite_object_set_var(script, VAO(object), "type", v);
+		//printf("module.mail: setting type %d\n", body->type);
+		if( body->subtype ) {
+			v = fe_new_str( "subtype", body->subtype, 0, FE_CHARSET_DEFAULT );
+			ferite_object_set_var( script, VAO(object), "subtype", v );
+		}
 
-	if( body->type == TYPEMULTIPART ) {
-		PART *part = NULL;
-		int i = 0;
-		char sec2[200];
-		FeriteVariable *ret = NULL, *parts = NULL;
+		if( body->type == TYPEMULTIPART ) {
+			PART *part = NULL;
+			int i = 0;
+			char sec2[200];
+			FeriteVariable *ret = NULL, *parts = NULL;
 
-		parts = ferite_hash_get(script,VAO(object)->variables->variables,"parts");
-		part = body->nested.part;
-		while( part ) {
-			i++;
-			if( sec ) {
-				snprintf(sec2,200,"%s.%d",sec,i);
-			} else {
-				snprintf(sec2,200,"%d",i);
+			parts = ferite_hash_get(script,VAO(object)->variables->variables,"parts");
+			part = body->nested.part;
+			while( part ) {
+				i++;
+				if( sec ) {
+					snprintf(sec2,200,"%s.%d",sec,i);
+				} else {
+					snprintf(sec2,200,"%d",i);
+				}
+				ret = create_ferite_content_object( script, stream, &part->body, msgno, sec2 );
+				ferite_uarray_add( script, VAUA(parts), ret , NULL, FE_ARRAY_ADD_AT_END );
+				part = part->next;
 			}
-			ret = create_ferite_content_object( script, stream, &part->body, msgno, sec2 );
-			ferite_uarray_add( script, VAUA(parts), ret , NULL, FE_ARRAY_ADD_AT_END );
-			part = part->next;
+			v = fe_new_lng("nparts", i);
+			ferite_object_set_var(script, VAO(object), "nparts", v );
 		}
-		v = fe_new_lng("nparts", i);
-		ferite_object_set_var(script, VAO(object), "nparts", v );
-	}
-	else
-	{
-		long len = 0,len2 = 0;
-		char *buf = NULL,*buf2 = NULL;
-		SIZEDTEXT src, dest;
-		FeriteVariable *v = NULL;
-		PARAMETER *param = NULL;
+		else
+		{
+			long len = 0,len2 = 0;
+			char *buf = NULL,*buf2 = NULL;
+			SIZEDTEXT src, dest;
+			FeriteVariable *v = NULL;
+			PARAMETER *param = NULL;
 
-		if( sec == NULL )
-			sec = "1";
-		buf = mail_fetchbody( stream, msgno, sec, &len );
+			if( sec == NULL )
+				sec = "1";
+			buf = mail_fetchbody( stream, msgno, sec, &len );
 
-		switch(body->encoding){
-			case ENCQUOTEDPRINTABLE:
-				if( debug_cmail_module )
-					printf("module.mail: Decoding from encoded quotable\n");
-				buf2 = rfc822_qprint(buf ,len,&len2);
-				break;
-			case ENCBASE64: 
-				if( debug_cmail_module )
-					printf("module.mail: Decoding from base64\n");
-				buf2=rfc822_base64(buf,len,&len2);
-				break;
-			default: 
-				buf2=buf;
-				len2=len;
-		}
-
-		if( debug_cmail_module ) {
-			printf("module.mail: id: %s, description: %s\n", body->id, body->description);
-			printf("module.mail: block type: %d.%s\n", body->type, body->subtype);
-		}
-		if( body->parameter ) /* Try and get the content type correctly */ {
-			PARAMETER *ptr = body->parameter;
-			while( ptr != NULL ) {
-				if( caseless_compare( ptr->attribute, "charset" ) ) {
+			switch(body->encoding){
+				case ENCQUOTEDPRINTABLE:
 					if( debug_cmail_module )
-						printf("module.mail: Found content type for block: %s\n", ptr->value);
-					v = fe_new_str("charset", ptr->value, 0, FE_CHARSET_DEFAULT);
-					ferite_object_set_var(script, VAO(object), "charset", v);
+						printf("module.mail: Decoding from encoded quotable\n");
+					buf2 = rfc822_qprint(buf ,len,&len2);
+					break;
+				case ENCBASE64: 
+					if( debug_cmail_module )
+						printf("module.mail: Decoding from base64\n");
+					buf2=rfc822_base64(buf,len,&len2);
+					break;
+				default: 
+					buf2=buf;
+					len2=len;
+			}
+
+			if( debug_cmail_module ) {
+				printf("module.mail: id: %s, description: %s\n", body->id, body->description);
+				printf("module.mail: block type: %d.%s\n", body->type, body->subtype);
+			}
+			if( body->parameter ) /* Try and get the content type correctly */ {
+				PARAMETER *ptr = body->parameter;
+				while( ptr != NULL ) {
+					if( caseless_compare( ptr->attribute, "charset" ) ) {
+						if( debug_cmail_module )
+							printf("module.mail: Found content type for block: %s\n", ptr->value);
+						v = fe_new_str("charset", ptr->value, 0, FE_CHARSET_DEFAULT);
+						ferite_object_set_var(script, VAO(object), "charset", v);
+					}
+					ptr = ptr->next;
 				}
-				ptr = ptr->next;
+			}
+			v = fe_new_str("content", buf2, len2, FE_CHARSET_DEFAULT );
+			ferite_object_set_var(script, VAO(object), "content", v );
+
+			v = fe_new_lng("encoding", body->encoding );
+			ferite_object_set_var(script, VAO(object), "encoding", v );
+
+			if( body->disposition.type && strcasecmp(body->disposition.type, "attachment") == 0) {
+				param = body->disposition.parameter;
+				while(param){
+					if( param->attribute && ((strcasecmp(param->attribute,"filename") == 0) ||
+												(strcasecmp(param->attribute,"name") == 0) ||
+												(strcasecmp(param->attribute,"name*") == 0) ||
+												(strcasecmp(param->attribute,"filename*") == 0) )) {
+						v = fe_new_str("filename", param->value, 0, FE_CHARSET_DEFAULT );
+						ferite_object_set_var(script, VAO(object), "filename", v );
+						break;
+					}
+					param=param->next;
+				}
+			} else {
+				param = body->parameter;
+				while(param){
+					if( param->attribute && ((strcasecmp(param->attribute,"filename") == 0) || 
+												(strcasecmp(param->attribute,"name") == 0))) {
+						v = fe_new_str("filename", param->value, 0, FE_CHARSET_DEFAULT );
+						ferite_object_set_var(script, VAO(object), "filename", v );
+						break;
+					}
+					param = param->next;
+				}
 			}
 		}
-		v = fe_new_str("content", buf2, len2, FE_CHARSET_DEFAULT );
-		ferite_object_set_var(script, VAO(object), "content", v );
-
-		v = fe_new_lng("encoding", body->encoding );
-		ferite_object_set_var(script, VAO(object), "encoding", v );
-
-		if( body->disposition.type && strcasecmp(body->disposition.type, "attachment") == 0) {
-			param = body->disposition.parameter;
-			while(param){
-				if( param->attribute && ((strcasecmp(param->attribute,"filename") == 0) ||
-											(strcasecmp(param->attribute,"name") == 0) ||
-											(strcasecmp(param->attribute,"name*") == 0) ||
-											(strcasecmp(param->attribute,"filename*") == 0) )) {
-					v = fe_new_str("filename", param->value, 0, FE_CHARSET_DEFAULT );
-					ferite_object_set_var(script, VAO(object), "filename", v );
-					break;
-				}
-				param=param->next;
-			}
-		} else {
-			param = body->parameter;
-			while(param){
-				if( param->attribute && ((strcasecmp(param->attribute,"filename") == 0) || 
-											(strcasecmp(param->attribute,"name") == 0))) {
-					v = fe_new_str("filename", param->value, 0, FE_CHARSET_DEFAULT );
-					ferite_object_set_var(script, VAO(object), "filename", v );
-					break;
-				}
-				param = param->next;
-			}
-		}
+		return object;
 	}
-	return object;
+	return NULL;
 }
 
 FeriteVariable *create_ferite_mail_object( FeriteScript *script, FeriteVariable *header, FeriteVariable *content )

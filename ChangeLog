@@ -1,3 +1,16 @@
+---------------------------------------------------------------------------------
+28.03.2008 12:08 (GMT), chris
+
+ * Behave better when network issues mean we don't get the email.
+
+--------------------------------------------------------------------------------
+28.03.2008 12:02 (GMT), chris
+
+ * Fixes to the handling of email:
+	- toHTML and toText will only provide output if there is data of that type
+	- has* content functions
+	- Better handling of errors in emails
+
 --------------------------------------------------------------------------------
 27.03.2008 15:50 (GMT), chris
 

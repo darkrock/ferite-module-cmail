@@ -64,9 +64,7 @@ namespace Mail {
 		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 
-		str = Regexp.replaceAll( '_', str, ' ' );
 		str = Regexp.replaceAll( '\n', str, '' );
-
 		if( o.match( str ) or o2.match( str ) ) {
 			return true;
 		}
@@ -78,10 +76,10 @@ namespace Mail {
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 		number currentIndex = 0;
 
-		str = Regexp.replaceAll( '_', str, ' ' );
+//		
 		str = Regexp.replaceAll( '\n', str, '' );
-
 		if( o.match( str ) ) {
+			str = Regexp.replaceAll( '_', str, ' ' );
 			o.matchAll( str ) using ( match ) {
 				if( match.span()[0] != currentIndex )
 					nstr += str[currentIndex..(match.span()[0]-1)];
@@ -102,7 +100,9 @@ namespace Mail {
 			return nstr;
 		}
 		else if( o2.match( str ) ) {
-			object match = o2.match( str );
+			object match = null;
+			str = Regexp.replaceAll( '_', str, ' ' );
+			match = o2.match( str );
 			str = Regexp.replaceAll( '%', str, '=' );
 			return .convertToUTF8From(Mail.Connection.qprint(match.capture(1)),match.capture(0));
 		}
@@ -287,6 +287,9 @@ namespace Mail {
 				FE_RETURN_NULL_OBJECT;
 			}
 
+			if( header == NULL || body == NULL ) {
+				FE_RETURN_NULL_OBJECT;
+			}
 			mail = create_ferite_mail_object( script, header, content );
 			if( mail == NULL ) {
 				set_error_string( script, self, "Internal error" );
@@ -461,34 +464,21 @@ namespace Mail {
 		function guessMainCharacterSet() {
 			return .content.characterSet();
 		}
-		/**
-		 * !function attachmentList
-		 * !declaration function attachmentList()
-		 * !brief Get an array of attached files
-		 * !return array of part objects
-		 */		
-		function attachmentList() {
+
+		function attachmentList()
 			return self.content.attachmentList();
-		}
+
+		function toText()
+			return self.content.toMessage( false );
 		
-		/**
-		 * !function get_msg_text
-		 * !declaration function get_msg_text()
-		 * !brief get mail content as plaintext
-		 * !return string
-		 */	
-		
-		function asText()
-			return Mail.stripTags(self.content.toMessage( false ));
-		
-		/**
-		 * !function asHTML
-		 * !declaration function asHTML()
-		 * !brief get mail content as html 
-		 * !return string
-		 */
-		function asHTML()
+		function toHTML()
 			return self.content.toMessage( true );
+			
+		function hasTextVersion()
+			return self.content.hasTextVersion();
+			
+		function hasHTMLVersion()
+			return self.content.hasHTMLVersion();
 	}
 	/**
 	 * !end
@@ -531,15 +521,14 @@ namespace Mail {
 		string host;
 		string name;
 		
+		function flatName()
+			return Mail.fixISOString(.name);
 		function flatAddress()
 			return "${.mailbox}@${.host}";
 	}
-	
 	/**
 	  * !end
 	  */
-	
-
 	
 	/**
 	 * !class AddressList
@@ -678,6 +667,27 @@ namespace Mail {
 			};
 			return list;
 		}
+		
+		function hasTextVersion() {
+			boolean result = false;
+			.parts.each() using ( part ) {
+				if( part.hasTextVersion() ) {
+					result = true;
+					return false;
+				}
+			};
+			return result;
+		}
+		function hasHTMLVersion() {
+			boolean result = false;
+			.parts.each() using ( part ) {
+				if( part.hasHTMLVersion() ) {
+					result = true;
+					return false;
+				}
+			};
+			return result;
+		}
 	}
 
 	
@@ -707,34 +717,52 @@ namespace Mail {
 		function isMultipart() {
 			return false;
 		}
-		
 		function characterSet() {
 			return .charset;
 		}
-		function toMessage( boolean wantHTML ){
-			if( .filename ) {
-				return "[${Mime.toString(.type)}/${.subtype}:${Mail.fixISOString(.filename)}]";
-			} else if( .type == Mime.TYPETEXT and ['plain', 'html'].valueExists(.subtype.toLower()) ) {
-				boolean containsHTML = String.compareNoCase(.subtype, "HTML");
-				string  content = .content;
-				/* Process the content */
-				/*  - Keep email addresses */
-			    content = Regexp.replaceAll('<(.*@.*?)>', content, '\1');
-				/*  - Convert the text to UTF-8 */
-			    content = Mail.convertToUTF8From( content, .charset );
-				if( (containsHTML and not wantHTML) ) {
-					content = Mail.stripHTML( content );
-				}
-				return content;
+		function isAttachment() {
+			return (.filename != '');
+		}
+		function fileName() {
+			string actual_name = Mail.fixISOString(.filename);
+			if( File.name(actual_name) ){
+				actual_name = File.name(actual_name);
 			}
+			if( actual_name[0] == "." ) {
+				actual_name = "unkwown$actual_name";
+			}
+			return actual_name;
+		}
+		function toMessage( boolean wantHTML ){
+			if( .isAttachment() ) {
+				return "attachment://${.fileName()}/${Mime.toString(.type)}:${.subtype}/";
+			} else if( .type == Mime.TYPETEXT ) {
+				string content = Mail.convertToUTF8From( .content, .charset );
+				if( wantHTML and .subtype.toLower() == 'html' ) {
+					return content;
+				} else if( not wantHTML and .subtype.toLower() == 'plain' ) {
+				    return Regexp.replaceAll('<(.*@.*?)>', content, '\1');
+				}
+			}
+			return '';
 		}
 		
 		function attachmentList() {
-		 	if( .filename ) {
-				.filename = Mail.fixISOString(.filename);
+		 	if( .isAttachment() ) {
 				return [ self ];
 			}
 			return [];
+		}
+		
+		function hasTextVersion() {
+			if( .type == Mime.TYPETEXT and .subtype.toLower() == 'plain' )
+				return true;
+			return false;
+		}
+		function hasHTMLVersion() {
+			if( .type == Mime.TYPETEXT and .subtype.toLower() == 'html' )
+				return true;
+			return false;
 		}
 	}	
 }
