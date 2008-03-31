@@ -1,0 +1,17 @@
+uses "cmail";
+uses "console";
+
+function fetchmail( string host, string username, string password, string mailbox ) {
+    object connection = new Mail.Connection();
+
+    if( connection.openMailbox( "{$host:993/imap/ssl/novalidate-cert/user=\"$username\"}$mailbox", password) ) {
+        number count = connection.messageCount();
+        for( number i = 1; i <= count; i++ ) {
+            object message = connection.messageAtIndex(i);
+            Console.println("Got message: ${message.getSubject()}: ${message.toText()}");
+			Console.println(message.extractIncomingHeaders());
+        }
+    }
+}
+
+fetchmail( "mail.server.se", "username", "password", "INBOX" );
