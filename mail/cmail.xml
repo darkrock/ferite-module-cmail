@@ -1,9 +1,9 @@
 <?xml version="1.0" ?>
 <module>
-    <name>mail</name>
+    <name>cmail</name>
     <documentation-list>
-        <include>mail.fec</include>
-        <include>Mime.fec</include>
+        <include>cmail.fec</include>
+        <include>cmime.fec</include>
     </documentation-list>
     <dependance-list>
     </dependance-list>

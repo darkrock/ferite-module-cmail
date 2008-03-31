@@ -1,6 +1,5 @@
 uses "cmail.lib";
 uses "array";
-uses "cmime";
 uses "regexp";
 uses "string";
 uses "iconv";
@@ -18,23 +17,45 @@ module-header {
 
 
 /**
- * !namespace Mail
- * !brief Classes for connections and messages
+ * @namespace Mail
+ * @brief     The holding namespace for Mail related tools
+ * @example <code>
+uses "cmail";
+<nl/>uses "console";
+<nl/>
+<nl/>function fetchmail( string host, string username, string password ) {
+<nl/><tab/>object connection = new Mail.Connection();
+<nl/>
+<nl/><tab/>if( connection.openMailbox( "{$host:993/imap/ssl/novalidate-cert/user=\"$username\"}", password) ) {
+<nl/><tab/><tab/>number count = connection.messageCount();
+<nl/><tab/><tab/>for( number i = 1; i <= count; i++ ) {
+<nl/><tab/><tab/><tab/>message = connection.messageAtIndex(i);
+<nl/><tab/><tab/><tab/>Console.println("Got message: ${message.getSubject()}: ${message.asText()}");
+<nl/><tab/><tab/>}
+<nl/><tab/>}
+<nl/>}
+<nl/>
+<nl/>fetchmail( "mail.myisp.com", "username", "password" );</code>
  */
+namespace modifies Mail {
 
-namespace Mail {
-
+	/**
+	 * @variable defaultEncodingTarget
+	 * @type     string
+	 * @brief    The default encoding required for email contents. The Mail module will convert all messages to 
+                 a default encoding to make handling of messages easier. The default and recommended default encoding
+                 is UTF-8. 
+	 */
 	string defaultEncodingTarget = "UTF-8";
 	
-     /**
-       * !function fixISOString
-       * !brief Convert quoted printable iso string
-       * !return string
-       */
-    function fixISOString(string str, number dontuse) 
-		return self.fixISOString(str );
-    
-
+	/**
+	 * @function convertToUTF8From
+	 * @declaration function convertToUTF8From( string content, string type )
+	 * @brief Convert a given string from a type to the default encoding
+	 * @param string content The content to convert
+	 * @param string type The source character set type
+	 * @return The converted string on success
+	 */
 	function convertToUTF8From( string content, string type ) {
 	    object convertor = null;
 
@@ -60,6 +81,13 @@ namespace Mail {
 		}
 		return content;
 	}
+	/**
+	 * @function canFixISOString
+	 * @declaration function canFixISOString( string str )
+	 * @brief Check to see if a given string can be converted from the ISO email format to plain text
+	 * @param string str The string to check
+	 * @return true if the string can be fixed, false otherwise
+	 */
 	function canFixISOString( string str ) {
 		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
@@ -70,13 +98,19 @@ namespace Mail {
 		}
 		return false;
 	}
+	/**
+	 * @function fixISOString
+	 * @declaration function fixISOString( string str )
+	 * @brief Convert a string from the ISO format to a plain text string
+	 * @param string str The string to convert
+	 * @return The converted string
+	 */
 	function fixISOString( string str ) {
 		string nstr;
 		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 		number currentIndex = 0;
 
-//		
 		str = Regexp.replaceAll( '\n', str, '' );
 		if( o.match( str ) ) {
 			str = Regexp.replaceAll( '_', str, ' ' );
@@ -108,12 +142,15 @@ namespace Mail {
 		}
 		return str;
 	}
+
 	/**
-	 * !function strip_html
-	 * !declaration function strip_html( string html )
-	 * !brief remove html tags from string
-	 * !return string
-	 */	
+	 * @function stripHTML
+	 * @declaration function stripHTML( string html )
+	 * @brief Strip the HTML from a given string
+	 * @description This function will convert various entities to plain text versions, remove tags and replaces line breaks with new lines.
+	 * @param string html The string to strip
+	 * @return A stripped string
+	 */
 	function stripHTML( string html ) {
 	    number i = 0;
 	    string result; 
@@ -122,7 +159,7 @@ namespace Mail {
 	    object regex = new Regexp("<br ?.*?>", "gxi");
 	    html = regex.replaceAll(html, "\n");
 
-	    result = self.strip_tags(html);
+	    result = self.stripTags(html);
 	    if(result != html ) {
 			for(i = 0; i < Array.size(entities); i++) {
 			    regex = new Regexp("(&" + entities[i][0] + ";)", "igx");
@@ -136,21 +173,14 @@ namespace Mail {
 	    return strip_tags(script, html->data, html->length);
 	}
 	
-
 	/**
-	 * !Class Connection
-	 * !brief Class for connection and issuing commands to mail servers ( pop,imap,mbox, SMTP )
+	 * @class Connection
+	 * @brief An instance of this class is required to connect to a mail server
 	 */
-	
 	class Connection
 	{
 		string _errstr;
 		string account_type; 
-
-		/**
-		 * !function connection
-		 * !brief constructor
-		 */
 
 		native function constructor() {
 			self->odata = NULL;
@@ -173,6 +203,14 @@ namespace Mail {
 			return ._errstr;
 		}
 
+		/**
+		 * @function qprint
+		 * @declaration static native function qprint( string str )
+		 * @brief Convert a normal string into a quoted printable string
+		 * @param string str The string to convert
+		 * @return A quoted printable version of the string
+		 * @static
+		 */
 		static native function qprint( string str ) {
 			FeriteVariable *v;	
 			char *nstr;
@@ -184,6 +222,14 @@ namespace Mail {
 			FE_RETURN_VAR( v );
 		}
 
+		/**
+		 * @function base64
+		 * @declaration static native function base64( string str )
+		 * @brief Base64 encode a string
+		 * @param string str The string to base64 encode
+		 * @return The string in base64 format
+		 * @static
+		 */
 		static native function base64( string str ) {
 			FeriteVariable *v;	
 			char *nstr;
@@ -194,6 +240,14 @@ namespace Mail {
 			v = fe_new_str( "base64", nstr, len2, FE_CHARSET_DEFAULT );
 			FE_RETURN_VAR( v );
 		}
+		/**
+		 * @function bit8
+		 * @declaration static native function bit8( string str )
+		 * @brief Using the RFC822 8bit specification, convert a string to be 8bit safe.
+		 * @param string str The string to convert
+		 * @return 8bit safe string
+		 * @static
+		 */
 		static native function bit8( string str ) {
 			FeriteVariable *v;	
 			char *nstr;
@@ -205,20 +259,54 @@ namespace Mail {
 			FE_RETURN_VAR( v );
 		}
 
-		//change to (server,servertype,  user, password )??
 		/**
-		 * !function openMailbox
-		 * !param string server/user
-		 * !param string password
-		 * !declaration native function open_mbox( string mbox, string passwd )
-		 * !brief Connect to mailserver ( POP3,IMAP, or local mbox )
-		 * !description  example: conn.openMailbox( "{Mail.mydomain.com:110/pop3/user=\"username\"}" , "mypass" ); 
-		 * !return number success ( bool )
+		 * @function openMailbox
+		 * @declaration function openMailbox( string proto, string host, number port, string username, string password )
+		 * @brief Connect and open the mailbox readed for reading
+		 * @param string proto The protocol (imap or pop3)
+		 * @param string host The host to connect to
+		 * @param number port The port to use (default pop3: 110, imap: 143 and imaps: 993)
+		 * @param string username The username to log in with
+		 * @param string password The password to use
+		 * @return true if connection successful, false otherwise
 		 */
-
 		function openMailbox( string proto, string host, number port, string username, string password ) {
 			return .openMailbox( "{$host:$port/$proto/user=\"$username\"}", password );
 		}
+		/**
+		 * @function openMailbox
+		 * @declaration native function openMailbox( string mbox, string passwd )
+		 * @brief Connect and open a given mailbox identifier
+		 * @description The mbox identifier can be made up of the following values:<nl/>
+		 * <nl/>
+		 * The mbox part, which is enclosed in '{' and '}', consists of the servers name or ip address, an optional port (prefixed by ':'), and an optional protocol specification (prefixed by '/'). All names which start with { are remote names, and are in the form "{" remote_system_name [":" port] [flags] "}" [mailbox_name] where:<nl/>
+		 * <nl/>
+		 * <emphasis>remote_system_name</emphasis> - Internet domain name or bracketed IP address of server.<nl/>
+		 * <emphasis>port</emphasis> - optional TCP port number, default is the default port for that service<nl/>
+		 * <emphasis>flags</emphasis> - optional flags, see following details.<nl/>
+		 * <emphasis>mailbox_name</emphasis> - remote mailbox name, default is INBOX<nl/>
+		 * <nl/>
+		 * <strong>/service=service</strong> : mailbox access service, default is "imap"<nl/>
+		 * <strong>/user=user</strong> : remote user name for login on the server<nl/>
+		 * <strong>/authuser=user</strong> : remote authentication user; if specified this is the user name whose password is used (e.g. administrator)<nl/>
+		 * <strong>/anonymous</strong> : remote access as anonymous user<nl/>
+		 * <strong>/debug</strong> : record protocol telemetry in application's debug log<nl/>
+		 * <strong>/secure</strong> : do not transmit a plaintext password over the network<nl/>
+		 * <strong>/imap, /imap2, /imap2bis, /imap4, /imap4rev1</strong> : equivalent to /service=imap<nl/>
+		 * <strong>/pop3</strong> : equivalent to /service=pop3<nl/>
+		 * <strong>/nntp</strong> :equivalent to /service=nntp<nl/>
+		 * <strong>/norsh</strong> : do not use rsh or ssh to establish a preauthenticated IMAP session<nl/>
+		 * <strong>/ssl</strong> :use the Secure Socket Layer to encrypt the session<nl/>
+		 * <strong>/validate-cert</strong> : validate certificates from TLS/SSL server (this is the default behavior)<nl/>
+		 * <strong>/novalidate-cert</strong> : do not validate certificates from TLS/SSL server, needed if server uses self-signed certificates<nl/>
+		 * <strong>/tls</strong> : force use of start-TLS to encrypt the session, and reject connection to servers that do not support it<nl/>
+		 * <strong>/notls</strong> : do not do start-TLS to encrypt the session, even with servers that support it<nl/>
+		 * <strong>/readonly</strong> :request read-only mailbox open (IMAP only; ignored on NNTP, and an error with SMTP and POP3)<nl/>
+		 * @example openMailbox("{host:993/imap/ssl/novalidate-cert/user="username"}INBOX", "password")
+		 * @param string mbox A description as above.
+		 * @param string passwd The password
+		 * @return rue if connection successful, false otherwise
+		 */
 		native function openMailbox( string mbox, string passwd ) {
 			char data[1024];
                         #include "imap/linkage.c" 
@@ -233,11 +321,10 @@ namespace Mail {
 		}
 
 		/**
-		 * !function close_mbox
-		 * !declaration native function close_mbox( )
-		 * !brief disconnect from server 
+		 * @function closeMailbox
+		 * @declaration native function closeMailbox( )
+		 * @brief Close the mailbox if it is open
 		 */
-
 		native function closeMailbox( ) {
 			if( SelfObj ) {
 				mail_close( SelfObj );
@@ -246,23 +333,23 @@ namespace Mail {
 		}
 		
 		/**
-		 * !function messageCount
-		 * !declaration native function messageCount()
-		 * !brief get number of messages in mailbox
-		 * !return number 
+		 * @function messageCount
+		 * @declaration native function messageCount( )
+		 * @brief Read the mailbox and return the number of messages within the mail box.
+		 * @return Message count as a number
 		 */
-
 		native function messageCount( ) {
 			FE_RETURN_LONG( SelfObj->nmsgs );
 		}
 
 		/**
-		 * !function mailAtIndex
-		 * !declaration native mailAtIndex( number n )
-		 * !brief get mail #n
-		 * !return object of class mailobj
+		 * @function messageAtIndex
+		 * @declaration native function messageAtIndex( number n )
+		 * @brief Fetch an entire message at a given index.
+		 * @warning All indicies are not like normal array indicies, the count starts at 1 and ends at .messageCount()
+		 * @param number n The index to fetch
+		 * @return A Mail.Message object on success, null otherwise
 		 */
-
 		native function messageAtIndex( number n ) {
 			ENVELOPE *env = NULL;
 			BODY *body = NULL;
@@ -298,6 +385,14 @@ namespace Mail {
 			
 			FE_RETURN_VAR( mail );
 		}
+		/**
+		 * @function messageHeaderAtIndex
+		 * @declaration native function messageHeaderAtIndex( number n )
+		 * @brief Fetch just the message header at a given index.
+		 * @warning All indicies are not like normal array indicies, the count starts at 1 and ends at .messageCount()
+		 * @param number n The index to fetch
+		 * @return A Mail.Message object on success with the header variable set, null otherwise
+		 */
 		native function messageHeaderAtIndex( number n ) {
 			ENVELOPE *env = NULL;
 			BODY *body = NULL;
@@ -326,16 +421,13 @@ namespace Mail {
 		}
 
 		/**
-		 * !function sendMail
-		 * !declaration native sendMail( string server, object mail )
-		 * !brief Connect to a SMTP server and send a mail
-		 * !param string server
-		 * !param object mail
-		 * !return number success true/false
-		 * !description connect to an SMTP server and send a mail
-		          example: conn.sendMail( "Mail.mydomain.com", myMail );
+		 * @function sendMessage
+		 * @declaration native function sendMessage( string server, object mailet )
+		 * @brief With a given Mail.Message object, send the email using the supplied SMTP server
+		 * @param string server The server to send the message with
+		 * @param object mailet The Mail.Message object to send
+		 * @return true on success, fales otherwise
 		 */
-	
 		native function sendMessage( string server, object mailet ) {
 			FeriteVariable *content, *header;
 			ENVELOPE *env;
@@ -379,24 +471,22 @@ namespace Mail {
 			FE_RETURN_TRUE;
 		}
 		
-		
 		/**
-		 * !function delete_marked 
-		 * !declaration native delete_marked 
-		 * !brief Connect to a SMTP server and send a mail
-		 * !return number success true/false
+		 * @function expungeMessages
+		 * @declaration native function expungeMessages()
+		 * @brief Expunge all messages flagge as being deleted 
 		 */
 		native function expungeMessages() {
 			mail_expunge( SelfObj );
 		}
-		
-		/**
-		 * !function set_delete_flag
-		 * !declaration native function set_delete_flag( number n )
-		 * !param 
-		 * !brief mark mail #n to be deleted
-		 */
 
+		/**
+		 * @function flagMessageDeleted
+		 * @declaration native function flagMessageDeleted( number n )
+		 * @brief Flag a message at a given index to be deleted. Use expungeMessages() to actually remove all the messages.
+		 * @warning All indicies are not like normal array indicies, the count starts at 1 and ends at .messageCount()
+		 * @param number n The message index to be flagged
+		 */
 		native function flagMessageDeleted( number n ) {
 			char str[9];
 			if( n > 0 && n < 100000000) { 
@@ -405,6 +495,13 @@ namespace Mail {
 			}
 		}
 
+		/**
+		 * @function flagMessageSeen
+		 * @declaration native function flagMessageSeen( number n )
+		 * @brief Flag a message at a given index as being seen.
+		 * @warning All indicies are not like normal array indicies, the count starts at 1 and ends at .messageCount()
+		 * @param number n The message index to be flagged
+		 */
 		native function flagMessageSeen( number n ) {
 			char str[7];
 			if( n > 0 && n < 100000000) { 
@@ -412,7 +509,14 @@ namespace Mail {
 				mail_setflag_full(SelfObj,str,"\\SEEN", NIL);
 			}
 		}
-
+		/**
+		 * @function messageBeenSeen
+		 * @declaration native function messageBeenSeen( number n )
+		 * @brief Check to see if a message at a given index has been seen.
+		 * @warning All indicies are not like normal array indicies, the count starts at 1 and ends at .messageCount()
+		 * @param number n The message index to check
+		 * @return true if the message has been seen, false otherwise.
+		 */
 		native function messageBeenSeen( number n ) {
 		    MESSAGECACHE *elt;
 		    if( n > 0 && n < 100000000) {
@@ -425,24 +529,27 @@ namespace Mail {
 		}
 	}
 	/**
-	 *!end
+	 * @end
 	 */
 
 	
-	/** 
-	* !class mailobj
-        * !brief Container for header and content
-	*/
+	/**
+	 * @class Message
+	 * @brief Every email is represented by a Mail.Message object
+	 */
  	class Message
 	{
 		/**
-		 * !variable object header
-		 * !brief object of class header
+		 * @variable header
+		 * @type     object
+		 * @brief    A variable of type Mail.MessageHeader
 		 */
 		object header;
-        /**
-		 * !variable object content 
-		 * !brief object of class Mail.part OR Mail.multipart
+		/**
+		 * @variable content
+		 * @type     object
+		 * @brief    An object of either Mail.MessageMultiPart or Mail.MessagePart
+		 * @static
 		 */
 		object content;
 
@@ -450,6 +557,12 @@ namespace Mail {
 			self.header = new Mail.MessageHeader();
 		}
 		
+		/**
+		 * @function getSubject
+		 * @declaration function getSubject()
+		 * @brief Get the message subject. This function will make sure that the string returned has been processed.
+		 * @return The subject
+		 */
 		function getSubject() {
 			string subject = (.header.subject ? .header.subject : '');
 			if( subject ){
@@ -461,47 +574,85 @@ namespace Mail {
 			}
 			return subject;
 		}
+		/**
+		 * @function guessMainCharacterSet
+		 * @declaration function guessMainCharacterSet()
+		 * @brief Guess, by looking at the message content, what the default character set of the incomming email was.
+		 * @return The character set as a string.
+		 */
 		function guessMainCharacterSet() {
 			return .content.characterSet();
 		}
-
+		/**
+		 * @function attachmentList
+		 * @declaration function attachmentList()
+		 * @brief Fetch an array of Mail.MessagePart(s) that are attachments to the email
+		 * @return An array of attachments.
+		 */
 		function attachmentList()
 			return self.content.attachmentList();
-
+			
+		/**
+		 * @function toText
+		 * @declaration function toText()
+		 * @brief The email as plain text. This will be a combination of the text/plain elements of the email.
+		 * @return A string containing the message body
+		 */
 		function toText()
 			return self.content.toMessage( false );
-		
+		/**
+		 * @function toHTML
+		 * @declaration function toHTML()
+		 * @brief The email as html. This will be a combination of the text/html elements of the email.
+		 * @description A description
+		 * @return The return values
+		 */
 		function toHTML()
 			return self.content.toMessage( true );
-			
+		/**
+		 * @function hasTextVersion
+		 * @declaration function hasTextVersion()
+		 * @brief Check to see if the email has a text/plain part(s) to it.
+		 * @return true if there is a text/plain block, false otherwise
+		 */
 		function hasTextVersion()
 			return self.content.hasTextVersion();
-			
+		/**
+		 * @function hasHTMLVersion
+		 * @declaration function hasHTMLVersion()
+		 * @brief Check to see if the email has a text/html part(s) to it.
+		 * @return true if there is a text/html block, false otherwise
+		 */
 		function hasHTMLVersion()
 			return self.content.hasHTMLVersion();
 	}
 	/**
-	 * !end
+	 * @end
 	 */
-	
 
 	/**
-	 * !class address
-	 * !brief class for mailaddresses
+	 * @class Address
+	 * @brief A point of contact. So to speak.
 	 */
-	
 	class Address {
 		
-        /** 
-		 * !function address
-		 * !brief Constructor
-		 * !param string milbox
-		 * !param string host
-		 */
+        /**
+         * @function constructor
+         * @declaration function constructor( string mailbox, string host )
+         * @brief Create a Mail.Address object from a given mailbox name and host
+         * @param string mailbox The mailbox name e.g. user
+         * @param string host The host name e.g. cention.se
+         */
 		function constructor( string mailbox, string host ){
 			self.mailbox = mailbox;
 			self.host = host;
 		}
+		/**
+		 * @function constructor
+		 * @declaration function constructor( string addr )
+		 * @brief Create a Mail.Address object from a given email address
+		 * @param string addr The email address
+		 */
 		function constructor( string addr ) {
 			array hits;
 			object result;
@@ -517,76 +668,158 @@ namespace Mail {
 			raise new Error("Invalid email address passed to Mail.Address constructor");
 		}
 
+		/**
+		 * @variable mailbox
+		 * @type     string
+		 * @brief    The name of the user for the mail box
+		 */
 		string mailbox;
+		/**
+		 * @variable host
+		 * @type     string
+		 * @brief    The email host
+		 */
 		string host;
+		/**
+		 * @variable name
+		 * @type     string
+		 * @brief    The real world name of the user. Please use .flatName() to access this value
+		 */
 		string name;
 		
+		/**
+		 * @function flatName
+		 * @declaration function flatName()
+		 * @brief The name of the user. This function will make sure that the name is fixed and converted into plain text	
+		 * @return The name of the user
+		 */
 		function flatName()
 			return Mail.fixISOString(.name);
+		/**
+		 * @function flatAddress
+		 * @declaration function flatAddress()
+		 * @brief The combined email address as a string
+		 * @return See the brief.
+		 */
 		function flatAddress()
 			return "${.mailbox}@${.host}";
 	}
 	/**
-	  * !end
-	  */
+	 * @end
+	 */
 	
 	/**
-	 * !class AddressList
-	 * !brief container for addresses
+	 * @class AddressList
+	 * @brief A list of addresses
 	 */
-
 	class AddressList {
+		/**
+		 * @variable list
+		 * @type     array
+		 * @brief    The Mail.Address list
+		 */
 		array list;
 
 		/**
-		 * !function add
-		 * !brief add an addressobject to the list
-		 * !param object address
+		 * @function add
+		 * @declaration function add(object address)
+		 * @brief Add a Mail.Address object to the list
+		 * @param object address The object to add
 		 */
-
 		function add(object address){
 			Array.push( self.list, address );
 		}
 		/**
-		 * !function flatAddresses
-		 * !brief get a list of strings
-		 * !return array 
+		 * @function flatAddresses
+		 * @declaration function flatAddresses()
+		 * @brief Get an array of string representing the flatAddress() of each Mail.Address object
+		 * @description A description
+		 * @return The return values
 		 */
 		function flatAddresses() {
 			array list = [];
 			.list.each() using ( address ) {
-				list[] = "${address.mailbox}@${address.host}";
+				list[] = address.flatAddress();
 			};
 			return list;
 		}
 	}
 	/**
-	 * !end
+	 * @end
 	 */
 	
 	/**
-	 * !class mail_header
-	 * !brief class for header fields
+	 * @class MessageHeader
+	 * @brief The header of a Mail.Message
 	 */
 	class MessageHeader {
+		/**
+		 * @variable to
+		 * @type     Mail.AddressList
+		 * @brief    The list of people the email was/should be sent to.
+		 */
 		object to;
+		/**
+		 * @variable cc
+		 * @type     Mail.AddressList
+		 * @brief    The list of people the email was/should be CC'd to
+		 */
 		object cc;
+		/**
+		 * @variable bcc
+		 * @type     Mail.AddressList
+		 * @brief    The list of people the email should be BCC'd to
+		 */
 		object bcc;
+		/**
+		 * @variable reply_to
+		 * @type     Mail.AddressList
+		 * @brief    The list of people the email was/should be replied to
+		 */
 		object reply_to;
+		/**
+		 * @variable from
+		 * @type     Mail.AddressList
+		 * @brief    An array containing a single Mail.Address that the email is/was from
+		 */
 		object from;
+		/**
+		 * @variable sender
+		 * @type     Mail.AddressList
+		 * @brief    The sender list
+		 */
 		object sender;
 		
-		string ID;
-		string in_reply_to;
-		string date;
-		string recieved;
-		string subject;
-
-		
 		/**
-		 * !function mail_header()
-		 * !brief constructor
+		 * @variable ID
+		 * @type     string
+		 * @brief    The message ID (should be unique)
 		 */
+		string ID;
+		/**
+		 * @variable in_reply_to
+		 * @type     string
+		 * @brief    The "In Reply To" message string
+		 */
+		string in_reply_to;
+		/**
+		 * @variable date
+		 * @type     string
+		 * @brief    The date the message was created
+		 */
+		string date;
+		/**
+		 * @variable recieved
+		 * @type     string
+		 * @brief    The date the message was received
+		 */
+		string recieved;
+		/**
+		 * @variable subject
+		 * @type     string
+		 * @brief    The message subject
+		 */
+		string subject;
 
 		function constructor(){
 			self.to = new Mail.AddressList();
@@ -598,12 +831,12 @@ namespace Mail {
 		}	
 	}
 	/**
- 	* !end		
- 	*/
+	 * @end
+	 */
 
 	/**
-	 * !class multipart
-	 * !brief a container for parts
+	 * @class MessageMultiPart
+	 * @brief A multipart container for a email block
 	 */
 	class MessageMultiPart
 	{
@@ -616,14 +849,46 @@ namespace Mail {
 			self.type = Mime.TYPEMULTIPART;
 		}
 		
+		/**
+		 * @function isMultipart
+		 * @declaration function isMultipart()
+		 * @brief Check to see if the given block is a multipart block
+		 * @return true if multipart, false otherwise.
+		 */
+		/**
+		 * @function characterSet
+		 * @declaration function characterSet()
+		 * @brief Guess the character set of the tree of parts
+		 * @return The character set, empty string otherwise
+		 */
+		/**
+		 * @function toMessage
+		 * @declaration function toMessage( boolean wantHTML )
+		 * @brief Fetch all the parts below and including this part
+		 * @param boolean wantHTML Whether html parts are required. true - only text/html is returned. false - only text/plain is returned.
+		 * @return The message body
+		 */
+		/**
+		 * @function attachmentList
+		 * @declaration function attachmentList()
+		 * @brief Fetch an array of Mail.MessagePart(s) that are attachments to the email
+		 * @return An array of attachments.
+		 */
+		/**
+		 * @function hasTextVersion
+		 * @declaration function hasTextVersion()
+		 * @brief Check to see if the part has a text/plain part(s) to it.
+		 * @return true if there is a text/plain block, false otherwise
+		 */
+		/**
+		 * @function hasHTMLVersion
+		 * @declaration function hasHTMLVersion()
+		 * @brief Check to see if the part has a text/html part(s) to it.
+		 * @return true if there is a text/html block, false otherwise
+		 */
 		function isMultipart(){
 			return true;
 		}
-		
-		function addPart(object sub) {
-			Array.push(self.parts,sub);
-		}
-		
 		function characterSet() {
 			string set = '';
 			.parts.each() using ( part ) {
@@ -633,25 +898,6 @@ namespace Mail {
 			};
 			return set;
 		}
-		
-		function addAttachment(string path){
-		    object regex;
-		    object match;
-			//Fixme check that file is readable
-			object part = new Mail.MessagePart();
-			part.filepath = path;
-			part.type = Mime.TYPEAPPLICATION;
-			part.subtype = "octet-stream";
-			part.encoding = Encoding.ENCBINARY;
-
-			regex = new Regexp(".*/([^/]+*)$");
-			if( (match = regexp.match(path)) )
-				part.filename = match.match();
-			else
-				part.filename = path; 
-			Array.push(self.parts,part);
-		}
-		
 		function toMessage( boolean wantHTML ) {
 			return .parts.join('') using ( part ) {
 				return part.toMessage( wantHTML );
@@ -688,14 +934,47 @@ namespace Mail {
 			};
 			return result;
 		}
-	}
+		/**
+		 * @function addPart
+		 * @declaration function addPart(object sub)
+		 * @brief Add a Mail.MessagePart or Mail.MessageMultiPart to this block
+		 * @param object sub The sub-part to add
+		 */
+		function addPart(object sub) {
+			Array.push(self.parts,sub);
+		}
+		/**
+		 * @function addAttachment
+		 * @declaration function addAttachment(string path)
+		 * @brief Add a given file as a part as an attachment
+		 * @param string path The path to the file
+		 */
+		function addAttachment(string path){
+		    object regex;
+		    object match;
+			//Fixme check that file is readable
+			object part = new Mail.MessagePart();
+			part.filepath = path;
+			part.type = Mime.TYPEAPPLICATION;
+			part.subtype = "octet-stream";
+			part.encoding = Encoding.ENCBINARY;
 
+			regex = new Regexp(".*/([^/]+*)$");
+			if( (match = regexp.match(path)) )
+				part.filename = match.match();
+			else
+				part.filename = path; 
+			Array.push(self.parts,part);
+		}
+	}
+	/**
+	 * @end
+	 */
 	
 	/**
-	 * !class part
-	 * !brief a content leaf on mailobj
+	 * @class MessagePart
+	 * @brief An inidividual content part of an email block
 	 */
-
 	class MessagePart
 	{
 		number type;
@@ -709,29 +988,49 @@ namespace Mail {
 		function constructor( ) {
 			self.type = Mime.TYPETEXT;
 		}
-		
-		function save(string path){
-			return -1;
-		}
-		
+
+		/**
+		 * @function isMultipart
+		 * @declaration function isMultipart()
+		 * @brief Check to see if the given block is a multipart block
+		 * @return true if multipart, false otherwise.
+		 */
+		/**
+		 * @function characterSet
+		 * @declaration function characterSet()
+		 * @brief Guess the character set of the tree of parts
+		 * @return The character set, empty string otherwise
+		 */
+		/**
+		 * @function toMessage
+		 * @declaration function toMessage( boolean wantHTML )
+		 * @brief Fetch all the parts below and including this part
+		 * @param boolean wantHTML Whether html parts are required. true - only text/html is returned. false - only text/plain is returned.
+		 * @return The message body
+		 */
+		/**
+		 * @function attachmentList
+		 * @declaration function attachmentList()
+		 * @brief Fetch an array of Mail.MessagePart(s) that are attachments to the email
+		 * @return An array of attachments.
+		 */
+		/**
+		 * @function hasTextVersion
+		 * @declaration function hasTextVersion()
+		 * @brief Check to see if the part has a text/plain part(s) to it.
+		 * @return true if there is a text/plain block, false otherwise
+		 */
+		/**
+		 * @function hasHTMLVersion
+		 * @declaration function hasHTMLVersion()
+		 * @brief Check to see if the part has a text/html part(s) to it.
+		 * @return true if there is a text/html block, false otherwise
+		 */		
 		function isMultipart() {
 			return false;
 		}
 		function characterSet() {
 			return .charset;
-		}
-		function isAttachment() {
-			return (.filename != '');
-		}
-		function fileName() {
-			string actual_name = Mail.fixISOString(.filename);
-			if( File.name(actual_name) ){
-				actual_name = File.name(actual_name);
-			}
-			if( actual_name[0] == "." ) {
-				actual_name = "unkwown$actual_name";
-			}
-			return actual_name;
 		}
 		function toMessage( boolean wantHTML ){
 			if( .isAttachment() ) {
@@ -753,7 +1052,6 @@ namespace Mail {
 			}
 			return [];
 		}
-		
 		function hasTextVersion() {
 			if( .type == Mime.TYPETEXT and .subtype.toLower() == 'plain' )
 				return true;
@@ -764,5 +1062,38 @@ namespace Mail {
 				return true;
 			return false;
 		}
-	}	
+		/**
+		 * @function isAttachment
+		 * @declaration function isAttachment()
+		 * @brief Check to see if the part is an attachment
+		 * @return true if it is an attachment, false otherwise
+		 */
+		function isAttachment() {
+			return (.filename != '');
+		}
+		/**
+		 * @function fileName
+		 * @declaration function fileName()
+		 * @brief The filename if it is an attachment, post-processed to remove encoding
+		 * @return The filename.
+		 */
+		function fileName() {
+			string actual_name = Mail.fixISOString(.filename);
+			if( File.name(actual_name) ){
+				actual_name = File.name(actual_name);
+			}
+			if( actual_name[0] == "." ) {
+				actual_name = "unkwown$actual_name";
+			}
+			return actual_name;
+		}
+	}
+	/**
+	 * @end
+	 */	
 }
+/**
+ * @end
+ */
+
+uses "cmime";
