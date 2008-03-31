@@ -236,6 +236,7 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 			if( body->parameter ) /* Try and get the content type correctly */ {
 				PARAMETER *ptr = body->parameter;
 				while( ptr != NULL ) {
+					printf("%s = %s\n", ptr->attribute, ptr->value);
 					if( caseless_compare( ptr->attribute, "charset" ) ) {
 						if( debug_cmail_module )
 							printf("module.mail: Found content type for block: %s\n", ptr->value);

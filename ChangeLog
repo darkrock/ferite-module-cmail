@@ -1,3 +1,9 @@
+--------------------------------------------------------------------------------
+31.03.2008 17:51 (BST), chris
+
+ * Added fetching of raw message to the Mail object
+ * Added function fetchCustomHeaders which provides an array of custom headers
+
 ---------------------------------------------------------------------------------
 28.03.2008 12:08 (GMT), chris
 

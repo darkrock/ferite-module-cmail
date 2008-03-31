@@ -3,6 +3,7 @@ uses "array";
 uses "regexp";
 uses "string";
 uses "iconv";
+uses "filesystem";
 
 module-header {
 	#include "imap_utility.h"
@@ -29,8 +30,8 @@ uses "cmail";
 <nl/><tab/>if( connection.openMailbox( "{$host:993/imap/ssl/novalidate-cert/user=\"$username\"}", password) ) {
 <nl/><tab/><tab/>number count = connection.messageCount();
 <nl/><tab/><tab/>for( number i = 1; i <= count; i++ ) {
-<nl/><tab/><tab/><tab/>message = connection.messageAtIndex(i);
-<nl/><tab/><tab/><tab/>Console.println("Got message: ${message.getSubject()}: ${message.asText()}");
+<nl/><tab/><tab/><tab/>object message = connection.messageAtIndex(i);
+<nl/><tab/><tab/><tab/>Console.println("Got message: ${message.getSubject()}: ${message.toText()}");
 <nl/><tab/><tab/>}
 <nl/><tab/>}
 <nl/>}
@@ -381,6 +382,14 @@ namespace modifies Mail {
 			if( mail == NULL ) {
 				set_error_string( script, self, "Internal error" );
 				FE_RETURN_NULL_OBJECT;
+			} else {
+				unsigned long header_length = 0, body_length = 0;
+				char *raw_header = mail_fetchheader_full( SelfObj, n, NULL, &header_length, 0 );
+				char *raw_body = mail_fetchtext_full( SelfObj, n, &body_length, 0 );
+				FeriteVariable *rawheaderv = ferite_object_get_var( script, VAO(mail), "rawHeader" );
+				FeriteVariable *rawcontentv = ferite_object_get_var( script, VAO(mail), "rawContent" );
+				ferite_str_set( script, VAS(rawheaderv), raw_header, header_length, FE_CHARSET_DEFAULT );
+				ferite_str_set( script, VAS(rawcontentv), raw_body, body_length, FE_CHARSET_DEFAULT );
 			}
 			
 			FE_RETURN_VAR( mail );
@@ -397,6 +406,7 @@ namespace modifies Mail {
 			ENVELOPE *env = NULL;
 			BODY *body = NULL;
 			FeriteVariable *header = NULL, *content = NULL, *mail = NULL;
+			unsigned long length = 0;
 			
 			if( (long)n < 1 || (long)n > SelfObj->nmsgs ) {
 				set_error_string( script, self, "Message number out of bounds" );
@@ -404,17 +414,19 @@ namespace modifies Mail {
 			}
 
 			env = mail_fetchenvelope( SelfObj, n );
-
 			header = create_ferite_header_object( script, env );
 			if( header == NULL ) {
 				set_error_string( script, self, "Couldn't create header" );
 				FE_RETURN_NULL_OBJECT;
 			}
-
 			mail = create_ferite_mail_object( script, header, content );
 			if( mail == NULL ) {
 				set_error_string( script, self, "Internal error" );
 				FE_RETURN_NULL_OBJECT;
+			} else {
+				char *raw_header = mail_fetchheader_full( SelfObj, n, NULL, &length, 0 );
+				FeriteVariable *rawheaderv = ferite_object_get_var( script, VAO(mail), "rawHeader" );
+				ferite_str_set( script, VAS(rawheaderv), raw_header, length, FE_CHARSET_DEFAULT );
 			}
 			
 			FE_RETURN_VAR( mail );
@@ -553,6 +565,42 @@ namespace modifies Mail {
 		 */
 		object content;
 
+		/**
+		 * @variable rawHeader
+		 * @type     string
+		 * @brief    The complete raw header for the message
+		 */
+		string rawHeader;
+		/**
+		 * @variable rawContent
+		 * @type     string
+		 * @brief    The complete raw content for the message
+		 */
+		string rawContent;
+
+		array extractedHeaders;
+		/**
+		 * @function extractCustomHeaders
+		 * @declaration function extractCustomHeaders()
+		 * @brief Extract the custom headers from the mail header and return a keyed array with the values
+		 * @return The headers in an associative array
+		 */
+		function extractCustomHeaders() {
+			if( not .extractedHeaders ) {
+				array s = String.dissect( Regexp.replaceAll("\r", .rawHeader, ""), "\n", 0 );
+				string lastHeader;
+				object m, r = new Regexp( '^([^:]+): (.*)' );
+				s.each() using ( line ) {
+					if( (m = r.match(line)) ) {
+						lastHeader = m.capture(0);
+						.extractedHeaders[lastHeader] = m.capture(1).trim(' ');
+					} else {
+						.extractedHeaders[lastHeader] += ' ' + line.trim(' ');
+					}
+				};
+			}
+			return .extractedHeaders;
+		}
 		function constructor(){
 			self.header = new Mail.MessageHeader();
 		}
@@ -799,7 +847,7 @@ namespace modifies Mail {
 		/**
 		 * @variable in_reply_to
 		 * @type     string
-		 * @brief    The "In Reply To" message string
+		 * @brief    The ID the email is in reply to. Allows the tracking of threads.
 		 */
 		string in_reply_to;
 		/**
@@ -1034,8 +1082,8 @@ namespace modifies Mail {
 		}
 		function toMessage( boolean wantHTML ){
 			if( .isAttachment() ) {
-				return "attachment://${.fileName()}/${Mime.toString(.type)}:${.subtype}/";
-			} else if( .type == Mime.TYPETEXT ) {
+				return "attachment://${.fileName()}/${Mail.Mime.toString(.type)}:${.subtype}/";
+			} else if( .type == Mail.Mime.TYPETEXT ) {
 				string content = Mail.convertToUTF8From( .content, .charset );
 				if( wantHTML and .subtype.toLower() == 'html' ) {
 					return content;
@@ -1053,12 +1101,12 @@ namespace modifies Mail {
 			return [];
 		}
 		function hasTextVersion() {
-			if( .type == Mime.TYPETEXT and .subtype.toLower() == 'plain' )
+			if( .type == Mail.Mime.TYPETEXT and .subtype.toLower() == 'plain' )
 				return true;
 			return false;
 		}
 		function hasHTMLVersion() {
-			if( .type == Mime.TYPETEXT and .subtype.toLower() == 'html' )
+			if( .type == Mail.Mime.TYPETEXT and .subtype.toLower() == 'html' )
 				return true;
 			return false;
 		}
