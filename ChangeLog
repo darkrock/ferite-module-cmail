@@ -1,4 +1,10 @@
 --------------------------------------------------------------------------------
+31.03.2008 18:49 (BST), chris
+
+ * Setting of outgoing email headers
+ * Slight clean up on the charset conversion functions
+
+--------------------------------------------------------------------------------
 31.03.2008 17:51 (BST), chris
 
  * Added fetching of raw message to the Mail object

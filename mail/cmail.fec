@@ -16,6 +16,12 @@ module-header {
 	#define SelfObj ((MAILSTREAM*)(self->odata))
 }
 
+/*
+ * TODO:
+ *   - Make sure outgoing subject is content encoded (check to see if characters fall out of ascii range, then quoteprintable them)
+ * 			.setSubject( string c, string charset )
+ *   - Make sure custom outgoing headers are dealt with the same
+ */
 
 /**
  * @namespace Mail
@@ -48,33 +54,39 @@ namespace modifies Mail {
                  is UTF-8. 
 	 */
 	string defaultEncodingTarget = "UTF-8";
+	/**
+	 * @variable defaultEncodingSource
+	 * @type     string
+	 * @brief    The default encoding assumed when emails do not provide a default encoding.
+	 */
+	string defaultEncodingSource = "ISO-8859-1";
 	
 	/**
-	 * @function convertToUTF8From
-	 * @declaration function convertToUTF8From( string content, string type )
+	 * @function convertToDefaultEncodingFrom
+	 * @declaration function convertToDefaultEncodingFrom( string content, string type )
 	 * @brief Convert a given string from a type to the default encoding
 	 * @param string content The content to convert
 	 * @param string type The source character set type
 	 * @return The converted string on success
 	 */
-	function convertToUTF8From( string content, string type ) {
+	function convertToDefaultEncodingFrom( string content, string type ) {
 	    object convertor = null;
 
 	    monitor {
-			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : 'ISO-8859-1'));
+			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : .defaultEncodingSource));
 	    } handle {
 			type = ""; //no convertion beacasue we have no convertor..... :/
 	    }
 		if( not type ) {
-			Console.println("module.mail: No charset requested, defaulting to ISO-8859-1");
+			Console.println("module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 		}
-		if( not (type.toLower() == 'utf-8') or (type.toLower() == 'utf8') ) {
+		if( not (type.toLower() == .defaultEncodingTarget.toLower()) ) {
 			monitor {
 				return convertor.convert(content);
 			} handle {
 				if( [ 'us-ascii' ].valueExists(type.toLower()) ) {
-					Console.println("module.module: $type failed, trying ISO-8859-1");
-					return .convertToUTF8From( content, 'ISO-8859-1' );
+					Console.println("module.module: $type failed, trying ${.defaultEncodingSource}");
+					return .convertToDefaultEncodingFrom( content, .defaultEncodingSource );
 				}
 				Console.println("module.mail: Error Converting from $type to ${Mail.defaultEncodingTarget}");
 				return content;
@@ -83,13 +95,13 @@ namespace modifies Mail {
 		return content;
 	}
 	/**
-	 * @function canFixISOString
-	 * @declaration function canFixISOString( string str )
+	 * @function canDecodeISOString
+	 * @declaration function canDecodeISOString( string str )
 	 * @brief Check to see if a given string can be converted from the ISO email format to plain text
 	 * @param string str The string to check
 	 * @return true if the string can be fixed, false otherwise
 	 */
-	function canFixISOString( string str ) {
+	function canDecodeISOString( string str ) {
 		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 
@@ -100,13 +112,13 @@ namespace modifies Mail {
 		return false;
 	}
 	/**
-	 * @function fixISOString
-	 * @declaration function fixISOString( string str )
+	 * @function decodeISOString
+	 * @declaration function decodeISOString( string str )
 	 * @brief Convert a string from the ISO format to a plain text string
 	 * @param string str The string to convert
 	 * @return The converted string
 	 */
-	function fixISOString( string str ) {
+	function decodeISOString( string str ) {
 		string nstr;
 		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
@@ -120,11 +132,11 @@ namespace modifies Mail {
 					nstr += str[currentIndex..(match.span()[0]-1)];
 
 				if( String.compareNoCase(match.capture(1), "q") )
-					nstr += .convertToUTF8From(Mail.Connection.qprint( match.capture(2) ), match.capture(0));
+					nstr += .convertToDefaultEncodingFrom(Mail.Connection.qprint( match.capture(2) ), match.capture(0));
 				else if( String.compareNoCase( match.capture(1), "b") )
-					nstr += .convertToUTF8From(Mail.Connection.base64( match.capture(2) ), match.capture(0));
+					nstr += .convertToDefaultEncodingFrom(Mail.Connection.base64( match.capture(2) ), match.capture(0));
 				else
-					nstr += .convertToUTF8From(match.capture(2), match,capture(0));
+					nstr += .convertToDefaultEncodingFrom(match.capture(2), match,capture(0));
 
 				currentIndex = match.span()[1];
 			};
@@ -139,11 +151,46 @@ namespace modifies Mail {
 			str = Regexp.replaceAll( '_', str, ' ' );
 			match = o2.match( str );
 			str = Regexp.replaceAll( '%', str, '=' );
-			return .convertToUTF8From(Mail.Connection.qprint(match.capture(1)),match.capture(0));
+			return .convertToDefaultEncodingFrom(Mail.Connection.qprint(match.capture(1)),match.capture(0));
 		}
 		return str;
 	}
-
+	/**
+	 * @function encodeISOString
+	 * @declaration function encodeISOString( string str )
+	 * @brief ISO encode a given string, this function assumes the strings character set is that of the default target
+	 * @param string str The string to encode
+	 * @return Encoded string
+	 */
+	function encodeISOString( string str ) {
+		return .encodeISOString( str, .defaultEncodingTarget );
+	}
+	/**
+	 * @function encodeISOString
+	 * @declaration function encodeISOString( string str, string charset )
+	 * @brief Encode a string from a given character set into an ISO format
+	 * @param string str The string to encode
+	 * @param string charset The character set to assume the string came from
+	 * @return The UTF-8 encoded ISO string.
+	 */
+	function encodeISOString( string str, string charset ) {
+		if( not .canDecodeISOString(str) and not Regexp.match('^[A-Za-z0-9.? -:]+$', str ) ) {
+			string real_str = str;
+			string enc_str = '';
+			if( charset != .defaultEncodingTarget ) {
+				real_str = .convertToDefaultEncodingFrom( str, charset );
+			}
+			real_str.blocks(50).each() using ( block ) {
+				enc_str += Mail.Connection.bit8( block );
+			};		
+		    enc_str = Regexp.replaceAll( '\ ', enc_str, '_' );
+		    enc_str = Regexp.replaceAll( '\?', enc_str, '=3F' );
+			if( real_str )
+			    return "=?${.defaultEncodingTarget}?Q?$enc_str?=";
+			return "";
+		} 
+		return str;
+	}
 	/**
 	 * @function stripHTML
 	 * @declaration function stripHTML( string html )
@@ -441,16 +488,22 @@ namespace modifies Mail {
 		 * @return true on success, fales otherwise
 		 */
 		function sendMessage( string server, object mail ) {
-			string original_subject = mail.header.subject;
-			string new_subject = mail.header.subject;
+			object old_header = mail.header;
+			object new_header = old_header.duplicate();
+			string new_subject = Mail.encodeISOString(old_header.subject);
 			boolean result = false;
-			
+			// Encode the headers
 			mail.outgoingHeaders.map() using ( key, value ) {
-				new_subject += "\r\n$key: $value";
+				new_subject += "\r\n$key: ${Mail.encodeISOString(value)}";
 			};
-			mail.header.subject = new_subject;
+			new_header.subject = new_subject;
+			// Check the encoding of names
+			new_header.checkEncoding();
+			// Swap out the old header
+			mail.header = new_header;
 			result = .__sendMessage( server, mail );
-			mail.header.subject = original_subject;
+			// Bring back the old header
+			mail.header = old_header;
 			return result;
 		}
 		native function __sendMessage( string server, object mailet ) {
@@ -640,10 +693,10 @@ namespace modifies Mail {
 		function getSubject() {
 			string subject = (.header.subject ? .header.subject : '');
 			if( subject ){
-				if( Mail.canFixISOString(subject) ) {
-					subject = Mail.fixISOString(subject);
+				if( Mail.canDecodeISOString(subject) ) {
+					subject = Mail.decodeISOString(subject);
 				} else if( .content ) {
-					subject = Mail.convertToUTF8From( subject, .guessMainCharacterSet() );
+					subject = Mail.convertToDefaultEncodingFrom( subject, .guessMainCharacterSet() );
 				}
 			}
 			return subject;
@@ -768,7 +821,7 @@ namespace modifies Mail {
 		 * @return The name of the user
 		 */
 		function flatName()
-			return Mail.fixISOString(.name);
+			return Mail.decodeISOString(.name);
 		/**
 		 * @function flatAddress
 		 * @declaration function flatAddress()
@@ -777,6 +830,17 @@ namespace modifies Mail {
 		 */
 		function flatAddress()
 			return "${.mailbox}@${.host}";
+			
+		function duplicate() {
+			object o = new Mail.Address();
+			o.mailbox = .mailbox;
+			o.host = .host;
+			o.name = .name;
+			return o;
+		}
+		function checkEncoding() {
+			.name = Mail.encodeISOString(.name);
+		}
 	}
 	/**
 	 * @end
@@ -816,6 +880,18 @@ namespace modifies Mail {
 				list[] = address.flatAddress();
 			};
 			return list;
+		}
+		function duplicate() {
+			object o = new Mail.AddressList();
+			.list.each() using ( address ) {
+				o.add( address.duplicate() );
+			};
+			return o;
+		}
+		function checkEncoding() {
+			.list.each() using ( address ) {
+				address.checkEncoding();
+			};
 		}
 	}
 	/**
@@ -902,7 +978,30 @@ namespace modifies Mail {
 			self.reply_to  = new Mail.AddressList();
 			self.cc = new Mail.AddressList();
 			self.sender = new Mail.AddressList();
-		}	
+		}
+		function duplicate() {
+			object o = new Mail.MessageHeader();
+			o.from = .from.duplicate();
+			o.sender = .sender.duplicate();
+			o.to = .to.duplicate();
+			o.cc = .cc.duplicate();
+			o.bcc = .bcc.duplicate();
+			o.reply_to = .reply_to.duplicate();
+			o.ID = .ID;
+			o.in_reply_to = .in_reply_to;
+			o.date = .date;
+			o.recieved = .recieved;
+			o.subject = .subject;
+			return o;
+		}
+		function checkEncoding() {
+			.from.checkEncoding();
+			.sender.checkEncoding();
+			.to.checkEncoding();
+			.cc.checkEncoding();
+			.bcc.checkEncoding();
+			.reply_to.checkEncoding();
+		}
 	}
 	/**
 	 * @end
@@ -1029,9 +1128,9 @@ namespace modifies Mail {
 			//Fixme check that file is readable
 			object part = new Mail.MessagePart();
 			part.filepath = path;
-			part.type = Mime.TYPEAPPLICATION;
+			part.type = Mail.Mime.TYPEAPPLICATION;
 			part.subtype = "octet-stream";
-			part.encoding = Encoding.ENCBINARY;
+			part.encoding = Mail.Encoding.ENCBINARY;
 
 			regex = new Regexp(".*/([^/]+*)$");
 			if( (match = regexp.match(path)) )
@@ -1061,6 +1160,7 @@ namespace modifies Mail {
 		
 		function constructor( ) {
 			self.type = Mail.Mime.TYPETEXT;
+			self.charset = 'UTF-8';
 		}
 
 		/**
@@ -1110,7 +1210,7 @@ namespace modifies Mail {
 			if( .isAttachment() ) {
 				return "attachment://${.fileName()}/${Mail.Mime.toString(.type)}:${.subtype}/";
 			} else if( .type == Mail.Mime.TYPETEXT ) {
-				string content = Mail.convertToUTF8From( .content, .charset );
+				string content = Mail.convertToDefaultEncodingFrom( .content, .charset );
 				if( wantHTML and .subtype.toLower() == 'html' ) {
 					return content;
 				} else if( not wantHTML and .subtype.toLower() == 'plain' ) {
@@ -1152,7 +1252,7 @@ namespace modifies Mail {
 		 * @return The filename.
 		 */
 		function fileName() {
-			string actual_name = Mail.fixISOString(.filename);
+			string actual_name = Mail.decodeISOString(.filename);
 			if( File.name(actual_name) ){
 				actual_name = File.name(actual_name);
 			}

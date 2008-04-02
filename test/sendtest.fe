@@ -8,13 +8,13 @@ object content = new Mail.MessagePart();
 
 object to = new Mail.Address("ctr","cention.se");
 object from = new Mail.Address("ctr","cention.se");
-from.name = "Chris Ross";
+from.name = "Chris ⸕ 仝 Ross";
 
 
 message.header = new Mail.MessageHeader();
 message.header.to.add( to );
 message.header.from.add( from );
-message.header.subject = "This is a test message";
+message.header.subject = "This is a test ＋互联网 message";
 message.setOutgoingHeader('X-Flag-Crut', 'hi there');
 message.setOutgoingHeader('X-Message-Flag', 'Hey there! Have a look at ferite!');
 
