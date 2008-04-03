@@ -743,19 +743,32 @@ namespace modifies Mail {
 		 * @function toText
 		 * @declaration function toText()
 		 * @brief The email as plain text. This will be a combination of the text/plain elements of the email.
+		 * @description You may pass this function a closure that takes one parameter - the Mail.MessagePart object that represents an attachment. 
+				The return from invoking this closure will be the content of the attachment in the email. This is useful when you desire custom anchors
+				or other functionality in the place of an attachment. If you do not supply a closure, the system will place attachment anchors within the
+				returned string, to retrieve these and do some processing, you need to use the function Mail.MessagePart.regexpForAttachmentAnchors 
+				to obtain an object that can be used to match the anchors within the text.
 		 * @return A string containing the message body
 		 */
-		function toText()
-			return self.content.toMessage( false );
+		function toText() {
+			object attachmentDelivery = recipient();
+			return self.content.toMessage( false, attachmentDelivery );
+		}
 		/**
 		 * @function toHTML
 		 * @declaration function toHTML()
 		 * @brief The email as html. This will be a combination of the text/html elements of the email.
-		 * @description A description
+		 * @description You may pass this function a closure that takes one parameter - the Mail.MessagePart object that represents an attachment. 
+				The return from invoking this closure will be the content of the attachment in the email. This is useful when you desire custom anchors
+				or other functionality in the place of an attachment. If you do not supply a closure, the system will place attachment anchors within the
+				returned string, to retrieve these and do some processing, you need to use the function Mail.MessagePart.regexpForAttachmentAnchors 
+				to obtain an object that can be used to match the anchors within the text.
 		 * @return The return values
 		 */
-		function toHTML()
-			return self.content.toMessage( true );
+		function toHTML() {
+			object attachmentDelivery = recipient();
+			return self.content.toMessage( true, attachmentDelivery );
+		}
 		/**
 		 * @function hasTextVersion
 		 * @declaration function hasTextVersion()
@@ -1059,6 +1072,7 @@ namespace modifies Mail {
 		 * @declaration function toMessage( boolean wantHTML )
 		 * @brief Fetch all the parts below and including this part
 		 * @param boolean wantHTML Whether html parts are required. true - only text/html is returned. false - only text/plain is returned.
+		 * @param object attachmentDelivery A closure to invoke when an attachment object is found when generating the message.
 		 * @return The message body
 		 */
 		/**
@@ -1091,9 +1105,9 @@ namespace modifies Mail {
 			};
 			return set;
 		}
-		function toMessage( boolean wantHTML ) {
+		function toMessage( boolean wantHTML, object attachmentDelivery ) {
 			return .parts.join('') using ( part ) {
-				return part.toMessage( wantHTML );
+				return part.toMessage( wantHTML, attachmentDelivery );
 			};
 		}
 		function attachmentList() {
@@ -1200,6 +1214,7 @@ namespace modifies Mail {
 		 * @declaration function toMessage( boolean wantHTML )
 		 * @brief Fetch all the parts below and including this part
 		 * @param boolean wantHTML Whether html parts are required. true - only text/html is returned. false - only text/plain is returned.
+		 * @param object attachmentDelivery A closure to invoke when an attachment object is found when generating the message.
 		 * @return The message body
 		 */
 		/**
@@ -1226,9 +1241,22 @@ namespace modifies Mail {
 		function characterSet() {
 			return .charset;
 		}
-		function toMessage( boolean wantHTML ){
+		/**
+		 * @function regexpForAttachmentAnchors
+		 * @declaration static function regexpForAttachmentAnchors { return new Regexp('attachment://([^/]*?)
+		 * @brief A regular expression object that will match the attachment anchors provided when no attachment block was provided on a to-() function
+		 * @return A regular expression object
+		 * @static
+		 */
+		static function regexpForAttachmentAnchors {
+			return new Regexp('attachment://([^/]*?)/type=([A-Za-z0-9-]+:[A-Za-z0-9-]+)/');
+		}
+		function toMessage( boolean wantHTML, object attachmentDelivery ) {
 			if( .isAttachment() ) {
-				return "attachment://${.fileName()}/${Mail.Mime.toString(.type)}:${.subtype}/";
+				if( attachmentDelivery )
+					return attachmentDelivery.invoke( self );
+			 	else
+					return "attachment://${.fileName()}/type=${Mail.Mime.toString(.type)}:${.subtype}/";
 			} else if( .type == Mail.Mime.TYPETEXT ) {
 				string content = Mail.convertToDefaultEncodingFrom( .content, .charset );
 				if( wantHTML and .subtype.toLower() == 'html' ) {
