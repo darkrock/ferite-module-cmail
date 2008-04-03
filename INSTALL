@@ -1,4 +1,30 @@
 
-Install lib-client.
+Install lib-client:
 
-Then compile and install this.
+	Fetch ftp://ftp.cac.washington.edu/mail/imap.tar.Z
+
+	Uncompress into a directory using tar Zxvf imap.tar.Z
+		- if you get an error, you may need to install 'uncompress' which is part of the ncompress package
+
+	Change to the created directory (imap-2007a in my case)
+
+	Run:
+		Mac OSX: make oxp
+		Linux:   make ln8
+
+	Let the build process complete.
+
+	Copy c-client/c-client.a to /cention/lib/libc-client.a
+
+	Make the directory /cention/include/c-client-2007a
+
+	Copy c-client/*.h c-client/linkage.* /cention/include/c-client-2007a
+
+	Create a link from /cention/include/c-client-2007a to /cention/include/imap
+
+Then compile and install this module:
+
+	./autogen.sh --with-uw-imap=/cention
+	make
+	sudo make install
+	sudo feritedoc --regenerate

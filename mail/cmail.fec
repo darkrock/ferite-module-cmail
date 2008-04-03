@@ -8,8 +8,8 @@ uses "filesystem";
 module-header {
 	#include "imap_utility.h"
 	#include <imap/linkage.h>
-
 	#include <imap/c-client.h>
+
 	extern char *curhst;
 	extern char *curusr;
 	extern char *global_pwd;
@@ -1300,14 +1300,17 @@ namespace modifies Mail {
 		 * @return The filename.
 		 */
 		function fileName() {
-			string actual_name = Mail.decodeISOString(.filename);
-			if( File.name(actual_name) ){
-				actual_name = File.name(actual_name);
+			if( .isAttachment() ) {
+				string actual_name = Mail.decodeISOString(.filename);
+				if( File.name(actual_name) ){
+					actual_name = File.name(actual_name);
+				}
+				if( actual_name[0] == "." ) {
+					actual_name = "unkwown$actual_name";
+				}
+				return actual_name;
 			}
-			if( actual_name[0] == "." ) {
-				actual_name = "unkwown$actual_name";
-			}
-			return actual_name;
+			return '';
 		}
 	}
 	/**

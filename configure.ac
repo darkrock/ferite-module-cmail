@@ -30,15 +30,19 @@ AM_CONDITIONAL(NEED_FERITE_LIB, test "$system" = "Darwin")
 AM_CONDITIONAL(NEED_FERITE_LIB, test "$system" = "CYGWIN")
 AM_CONDITIONAL(NEED_FERITE_LIB, test "$system" = "SunOS")
 
+gss=""
+if test "$system" = "Darwin"; then
+	gss="-lgssapi_krb5"
+fi
+AC_SUBST(gss)
 
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 AM_PROG_LIBTOOL
 
-AM_PATH_FERITE(0.99.5,,[
-  echo "You should have ferite 0.99.5 installed for this to work.";
+AM_PATH_FERITE(1.1.0,,[
+  echo "You should have ferite 1.1.0 installed for this to work.";
 ])
-
 
 sinclude(mail/config.m4)
 

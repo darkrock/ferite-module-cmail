@@ -1,5 +1,3 @@
-//From /usr/include/imap/mail.h
-
 /**
  * @namespace Mail
  * @modifies  Mail
