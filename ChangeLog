@@ -1,4 +1,11 @@
 --------------------------------------------------------------------------------
+03.04.2008 09:54 (BST), chris
+
+ * Added a helper function to open a specific mail box - openSpecificMailbox
+ * Renamed openMailbox(string,string) to openMailboxURI
+ * Fixed some documentation and added some warnings
+
+--------------------------------------------------------------------------------
 31.03.2008 18:49 (BST), chris
 
  * Setting of outgoing email headers

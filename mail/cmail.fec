@@ -16,13 +16,6 @@ module-header {
 	#define SelfObj ((MAILSTREAM*)(self->odata))
 }
 
-/*
- * TODO:
- *   - Make sure outgoing subject is content encoded (check to see if characters fall out of ascii range, then quoteprintable them)
- * 			.setSubject( string c, string charset )
- *   - Make sure custom outgoing headers are dealt with the same
- */
-
 /**
  * @namespace Mail
  * @brief     The holding namespace for Mail related tools
@@ -310,7 +303,7 @@ namespace modifies Mail {
 		/**
 		 * @function openMailbox
 		 * @declaration function openMailbox( string proto, string host, number port, string username, string password )
-		 * @brief Connect and open the mailbox readed for reading
+		 * @brief Connect and open the default mailbox readed for reading
 		 * @param string proto The protocol (imap or pop3)
 		 * @param string host The host to connect to
 		 * @param number port The port to use (default pop3: 110, imap: 143 and imaps: 993)
@@ -319,11 +312,26 @@ namespace modifies Mail {
 		 * @return true if connection successful, false otherwise
 		 */
 		function openMailbox( string proto, string host, number port, string username, string password ) {
-			return .openMailbox( "{$host:$port/$proto/user=\"$username\"}", password );
+			return .openSpecificMailbox( proto, host, port, username, password, "INBOX" );
 		}
 		/**
-		 * @function openMailbox
-		 * @declaration native function openMailbox( string mbox, string passwd )
+		 * @function openSpecificMailbox
+		 * @declaration function openSpecificMailbox( string proto, string host, number port, string username, string password, string mailbox )
+		 * @brief Connect to a server and open the specifically named mailbox for reading. If you supply the name "INBOX", the mail server will use the default inbox for the user.
+		 * @param string proto The protocol to use (imap/pop3)
+		 * @param string host The host to connec to 
+		 * @param number port The port to use (default pop3: 110, imap: 143 and imaps: 993)
+		 * @param string username The user to log in with
+		 * @param string password The passowrd to use
+		 * @param string mailbox The mailbox to connect to
+		 * @return true if connection successful, false otherwise
+		 */
+		function openSpecificMailbox( string proto, string host, number port, string username, string password, string mailbox ) {
+			return .openMailboxURI( "{$host:$port/$proto/user=\"$username\"}$mailbox", password );
+		}
+		/**
+		 * @function openMailboxURI
+		 * @declaration native function openMailboxURI( string mbox, string passwd )
 		 * @brief Connect and open a given mailbox identifier
 		 * @description The mbox identifier can be made up of the following values:<nl/>
 		 * <nl/>
@@ -355,9 +363,9 @@ namespace modifies Mail {
 		 * @param string passwd The password
 		 * @return rue if connection successful, false otherwise
 		 */
-		native function openMailbox( string mbox, string passwd ) {
+		native function openMailboxURI( string mbox, string passwd ) {
 			char data[1024];
-                        #include "imap/linkage.c" 
+#include "imap/linkage.c" 
 			global_pwd = passwd->data;
 
 			self->odata = mail_open( SelfObj, mbox->data, 0);
@@ -372,12 +380,15 @@ namespace modifies Mail {
 		 * @function closeMailbox
 		 * @declaration native function closeMailbox( )
 		 * @brief Close the mailbox if it is open
+		 * @return true if the mail box has been closed, false otherwise
 		 */
 		native function closeMailbox( ) {
 			if( SelfObj ) {
 				mail_close( SelfObj );
+				self->odata = NULL;
+				FE_RETURN_TRUE;
 			}
-			self->odata = NULL;
+			FE_RETURN_FALSE;
 		}
 		
 		/**
@@ -483,6 +494,9 @@ namespace modifies Mail {
 		 * @function sendMessage
 		 * @declaration native function sendMessage( string server, object mailet )
 		 * @brief With a given Mail.Message object, send the email using the supplied SMTP server
+		 * @warning This function will automatically ISO encode headers, names and the subject of the email if it needs to be done.
+					The change will not be reflected when the function has returned. This means you need not worry about correct ISO
+					string escaping for the various parts of the email - just assign strings and away you go.
 		 * @param string server The server to send the message with
 		 * @param object mailet The Mail.Message object to send
 		 * @return true on success, fales otherwise
@@ -556,6 +570,7 @@ namespace modifies Mail {
 		 */
 		native function expungeMessages() {
 			mail_expunge( SelfObj );
+			FE_RETURN_TRUE;
 		}
 
 		/**
@@ -567,10 +582,12 @@ namespace modifies Mail {
 		 */
 		native function flagMessageDeleted( number n ) {
 			char str[9];
-			if( n > 0 && n < 100000000) { 
+			if( n > 0 && n <= SelfObj->nmsgs ) { 
 				sprintf (str,"%lu",(long)n);
 				mail_setflag_full(SelfObj, str, "\\DELETED", NIL);
+				FE_RETURN_TRUE;
 			}
+			FE_RETURN_FALSE;
 		}
 
 		/**
@@ -582,10 +599,12 @@ namespace modifies Mail {
 		 */
 		native function flagMessageSeen( number n ) {
 			char str[7];
-			if( n > 0 && n < 100000000) { 
+			if( n > 0 && n <= SelfObj->nmsgs ) { 
 				sprintf(str,"%lu",(long)n);
 				mail_setflag_full(SelfObj,str,"\\SEEN", NIL);
+				FE_RETURN_TRUE;
 			}
+			FE_RETURN_FALSE;
 		}
 		/**
 		 * @function messageBeenSeen
@@ -597,7 +616,7 @@ namespace modifies Mail {
 		 */
 		native function messageBeenSeen( number n ) {
 		    MESSAGECACHE *elt;
-		    if( n > 0 && n < 100000000) {
+		    if( n > 0 && n <= SelfObj->nmsgs ) {
 				elt  = mail_elt(SelfObj, n);
 				if( elt->seen ) { // elt->recent)
 			    	FE_RETURN_TRUE;
@@ -641,6 +660,7 @@ namespace modifies Mail {
 		 * @variable rawContent
 		 * @type     string
 		 * @brief    The complete raw content for the message
+		 * @warning  Be careful using this variable, it could be multiple megabytes big which can be very slow to process.
 		 */
 		string rawContent;
 
