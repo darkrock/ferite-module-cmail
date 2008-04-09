@@ -30,9 +30,9 @@ cmail_la_SOURCES    = \
 	cmail_header.h \
 	cmail_core.c \
 	cmail_misc.c \
-	cmail_Mime.c \
 	cmail_Mail.c \
-	cmail_Encoding.c \
+	cmail_Mail_Encoding.c \
+	cmail_Mail_Mime.c \
 	cmail_Mail_Address.c \
 	cmail_Mail_Message.c \
 	cmail_Mail_MessagePart.c \
