@@ -12,6 +12,12 @@ Install lib-client:
 		Mac OSX: make oxp
 		Linux:   make ln8
 
+		If this step fails due to errors about ssl.h, you probably have SSL in a non-standard place or
+		100 other reasons that cause c-client to fail. You can compile without SSL by using the same
+		command and appending SSLTYPE=none on the end. e.g.
+		
+		make ln8 SSLTYPE=none
+
 	Let the build process complete.
 
 	Copy c-client/c-client.a to /cention/lib/libc-client.a
