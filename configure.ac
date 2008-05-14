@@ -31,6 +31,9 @@ AM_CONDITIONAL(NEED_FERITE_LIB, test "$system" = "CYGWIN")
 AM_CONDITIONAL(NEED_FERITE_LIB, test "$system" = "SunOS")
 
 gss=""
+if test "$system" = "Linux"; then
+	gss="-lcrypt"
+fi
 if test "$system" = "Darwin"; then
 	gss="-lgssapi_krb5 -lpam"
 fi
