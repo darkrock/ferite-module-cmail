@@ -4,6 +4,7 @@ uses "regexp";
 uses "string";
 uses "iconv";
 uses "filesystem";
+uses "console";
 
 module-header {
 	#include "imap_utility.h"
@@ -824,8 +825,8 @@ namespace modifies Mail {
 			if( hits && hits[0] && hits[1] ) {
 				self.mailbox = hits[0];
 				self.host = hits[1];
-			}
-			raise new Error("Invalid email address passed to Mail.Address constructor");
+			} else
+				raise new Error("Invalid email address passed to Mail.Address constructor");
 		}
 
 		/**
