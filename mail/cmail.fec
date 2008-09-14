@@ -48,6 +48,8 @@ namespace modifies Mail {
                  is UTF-8. 
 	 */
 	string defaultEncodingTarget = "UTF-8";
+	array  defaultEncodingTargetVariants;
+	
 	/**
 	 * @variable defaultEncodingSource
 	 * @type     string
@@ -63,9 +65,19 @@ namespace modifies Mail {
 	 * @param string type The source character set type
 	 * @return The converted string on success
 	 */
+	function requestedTypeIsTarget( string type ) {
+		return (type.toLower() == .defaultEncodingTarget.toLower()) or (.defaultEncodingTargetVariants.valueExists(type.toUpper()));
+	}
 	function convertToDefaultEncodingFrom( string content, string type ) {
 	    object convertor = null;
 
+		if( .requestedTypeIsTarget(type) and not content.isUTF8() ) {
+			// Special case, if it claims to be UTF-8 and there is no UTF-8 characters within the code, we try to convert it
+			// Sometimes emails will claim UTF-8, but will actually encode into ISO-8859-1
+			Console.println("Invoking special case: claims UTF-8, no UTF-8 found, attempting convert from ${.defaultEncodingSource}");
+			type = .defaultEncodingSource;
+		}
+		
 	    monitor {
 			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : .defaultEncodingSource));
 	    } handle {
@@ -74,7 +86,8 @@ namespace modifies Mail {
 		if( not type ) {
 			Console.println("module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 		}
-		if( not (type.toLower() == .defaultEncodingTarget.toLower()) ) {
+
+		if( not .requestedTypeIsTarget(type) ) {
 			monitor {
 				return convertor.convert(content);
 			} handle {
@@ -120,6 +133,7 @@ namespace modifies Mail {
 
 		str = Regexp.replaceAll( '\n', str, '' );
 		if( o.match( str ) ) {
+			str = Regexp.replaceAll( ' ', str, '' );
 			str = Regexp.replaceAll( '_', str, ' ' );
 			o.matchAll( str ) using ( match ) {
 				if( match.span()[0] != currentIndex )
@@ -1323,3 +1337,5 @@ namespace modifies Mail {
  */
 
 uses "cmime";
+
+Mail.defaultEncodingTargetVariants = [ 'UTF-8', 'UTF8' ];

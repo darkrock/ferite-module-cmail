@@ -49,7 +49,7 @@ int create_address(FeriteScript *script, FeriteVariable *object, ADDRESS *addr) 
 
 
 FeriteVariable *create_address_list(FeriteScript *script, ADDRESS *root) {
-        FeriteNamespaceBucket *nsb;
+    FeriteNamespaceBucket *nsb;
 	FeriteVariable *address_list, *item_list, *item;
 	ADDRESS *curr;
 	int error;
@@ -204,10 +204,11 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 		else
 		{
 			long len = 0,len2 = 0;
-			char *buf = NULL,*buf2 = NULL;
+			unsigned char *buf = NULL, *buf2 = NULL;
 			SIZEDTEXT src, dest;
 			FeriteVariable *v = NULL;
 			PARAMETER *param = NULL;
+			int i = 0;
 
 			if( sec == NULL )
 				sec = "1";
@@ -217,7 +218,7 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 				case ENCQUOTEDPRINTABLE:
 					if( debug_cmail_module )
 						printf("module.mail: Decoding from encoded quotable\n");
-					buf2 = rfc822_qprint(buf ,len,&len2);
+					buf2 = rfc822_qprint(buf,len,&len2);
 					break;
 				case ENCBASE64: 
 					if( debug_cmail_module )
@@ -303,10 +304,8 @@ FeriteVariable *create_ferite_mail_object( FeriteScript *script, FeriteVariable 
 
 
 BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
-
-
-	BODY *body;
-	FeriteVariable *v;
+	BODY *body = NULL;
+	FeriteVariable *v = NULL;
 
 
 	body =  mail_newbody();
@@ -394,7 +393,7 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 
 BODY *create_imap_content_object(FeriteScript* script, FeriteVariable* fe_parent)
 {
-        FeriteVariable *parts_list,*fe_child,*v;
+	FeriteVariable *parts_list,*fe_child,*v;
 	BODY *root,*new_body;
 	PART *new_part,*last_part =  NULL;
 	int i=0;
