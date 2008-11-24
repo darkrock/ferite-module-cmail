@@ -212,9 +212,6 @@ namespace modifies Mail {
 	    string result; 
 	    array entities = [ ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"] ];
 
-	    object regex = new Regexp("<br ?.*?>", "gxi");
-	    html = regex.replaceAll(html, "\n");
-
 	    result = self.stripTags(html);
 	    if(result != html ) {
 			for(i = 0; i < Array.size(entities); i++) {
@@ -225,8 +222,19 @@ namespace modifies Mail {
 	    return result;
 	}
 
-	native function stripTags(string html) {
-	    return strip_tags(script, html->data, html->length);
+	function stripTags( string html ) {
+		string emailAddress = '(([A-Za-z0-9]+)\.?)+@(([A-Za-z0-9]+)\.?)+';
+		object capture_email = new Regexp("<($emailAddress)>");
+		object strip_comment = new Regexp("<!--.*?-->", 's');
+		object strip_tag = new Regexp("</?.*?>");
+		object compress_whitespace = new Regexp('[ \t]+');
+		object br_replace = new Regexp("<br */?>", "gxi");
+
+	    html = br_replace.replaceAll(html, "\n");
+		html = capture_email.replaceAll(html, '\1');
+		html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
+
+		return html;
 	}
 	
 	/**
