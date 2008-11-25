@@ -842,13 +842,16 @@ namespace modifies Mail {
 			object regex = new Regexp("(.*?)\@(.*)", "i");
 
 			result = regex.match( addr );
-			hits = result.captures();
 
-			if( hits && hits[0] && hits[1] ) {
-				self.mailbox = hits[0];
-				self.host = hits[1];
-			} else
-				raise new Error("Invalid email address passed to Mail.Address constructor");
+			if( result ) {
+				hits = result.captures();
+				if( hits && hits[0] && hits[1] ) {
+					self.mailbox = hits[0];
+					self.host = hits[1];
+					return;
+				}
+			}
+			raise new Error("Invalid email address ($addr) passed to Mail.Address constructor");
 		}
 
 		/**
