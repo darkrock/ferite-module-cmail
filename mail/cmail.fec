@@ -15,6 +15,9 @@ module-header {
 	extern char *curusr;
 	extern char *global_pwd;
 	#define SelfObj ((MAILSTREAM*)(self->odata))
+	
+	extern FeriteScript *output_script;
+	extern FeriteObject *output_closure;
 }
 
 /**
@@ -39,6 +42,34 @@ uses "cmail";
 <nl/>fetchmail( "mail.myisp.com", "username", "password" );</code>
  */
 namespace modifies Mail {
+	
+	final number OUTPUT_DEBUG = 1;
+	final number OUTPUT_NORMAL = 2;
+	final number OUTPUT_WARNING = 3;
+	final number OUTPUT_ERROR = 4;
+	
+	function outputTypeToString( number type ) {
+		switch(type) {
+			case Mail.OUTPUT_DEBUG: return 'debug';
+			case Mail.OUTPUT_NORMAL: return 'normal';
+			case Mail.OUTPUT_WARNING: return 'warning';
+			case Mail.OUTPUT_ERROR: return 'error';
+			default:
+				return '';
+		}
+		return '';
+	}
+	native function registerOutput( object output ) {
+		output_script = script;
+		if( output_closure ) {
+			FDECREF(output_closure);
+		}
+		output_closure = output;
+		FINCREF(output_closure);
+	}
+	native function output( number type, string text ) {
+		output_printf( (int)type, text->data );
+	}
 
 	/**
 	 * @variable defaultEncodingTarget
@@ -74,7 +105,7 @@ namespace modifies Mail {
 		if( .requestedTypeIsTarget(type) and not content.isUTF8() ) {
 			// Special case, if it claims to be UTF-8 and there is no UTF-8 characters within the code, we try to convert it
 			// Sometimes emails will claim UTF-8, but will actually encode into ISO-8859-1
-			Console.println("Invoking special case: claims UTF-8, no UTF-8 found, attempting convert from ${.defaultEncodingSource}");
+			Mail.output(Mail.OUTPUT_NORMAL,"Invoking special case: claims UTF-8, no UTF-8 found, attempting convert from ${.defaultEncodingSource}");
 			type = .defaultEncodingSource;
 		}
 		
@@ -84,7 +115,7 @@ namespace modifies Mail {
 			type = ""; //no convertion beacasue we have no convertor..... :/
 	    }
 		if( not type ) {
-			Console.println("module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
+			Mail.output(Mail.OUTPUT_NORMAL,"module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 		}
 
 		if( not .requestedTypeIsTarget(type) ) {
@@ -92,10 +123,10 @@ namespace modifies Mail {
 				return convertor.convert(content);
 			} handle {
 				if( [ 'us-ascii' ].valueExists(type.toLower()) ) {
-					Console.println("module.module: $type failed, trying ${.defaultEncodingSource}");
+					Mail.output(Mail.OUTPUT_WARNING,"module.module: $type failed, trying ${.defaultEncodingSource}");
 					return .convertToDefaultEncodingFrom( content, .defaultEncodingSource );
 				}
-				Console.println("module.mail: Error Converting from $type to ${Mail.defaultEncodingTarget}");
+				Mail.output(Mail.OUTPUT_ERROR,"module.mail: Error Converting from $type to ${Mail.defaultEncodingTarget}");
 				return content;
 			}
 		}
@@ -527,7 +558,8 @@ namespace modifies Mail {
 		function sendMessage( string server, object mail ) {
 			object old_header = mail.header;
 			object new_header = old_header.duplicate();
-			string new_subject = Mail.encodeISOString(old_header.subject);
+			string new_subject = Mail.encodeISOString(Regexp.replaceAll('[\r\n]', old_header.subject, ' '));
+			
 			boolean result = false;
 			// Encode the headers
 			mail.outgoingHeaders.map() using ( key, value ) {
@@ -544,10 +576,10 @@ namespace modifies Mail {
 			return result;
 		}
 		native function __sendMessage( string server, object mailet ) {
-			FeriteVariable *content, *header;
-			ENVELOPE *env;
-			BODY *body;
-			SENDSTREAM *stream;
+			FeriteVariable *content = NULL, *header = NULL;
+			ENVELOPE *env = NULL;
+			BODY *body = NULL;
+			SENDSTREAM *stream = NULL;
 
 			char *hostlist[] = { server->data, NIL };
 			
@@ -570,13 +602,12 @@ namespace modifies Mail {
 				FE_RETURN_FALSE;
 			}
 
-			stream = smtp_open( hostlist, 0); //SOP_TRYSSL
+			stream = smtp_open( hostlist, FE_FALSE); //SOP_TRYSSL
  
 			if( stream == NULL ) {
-				set_error_string( script, self,"Error  opening SMTP stream" );
+				set_error_string( script, self,"Error opening SMTP stream" );
 				FE_RETURN_FALSE;
 			}
-
 	
 			if( smtp_mail( stream, "MAIL", env, body ) == NIL ) {
 				set_error_string( script, self,"SMTP Error" );
@@ -1350,3 +1381,8 @@ namespace modifies Mail {
 uses "cmime";
 
 Mail.defaultEncodingTargetVariants = [ 'UTF-8', 'UTF8' ];
+Mail.registerOutput( closure(number type, string value) {
+	if( type >= Mail.OUTPUT_NORMAL ) {
+		Console.println("[mail-module.${Mail.outputTypeToString(type)}] $value");
+	}
+});

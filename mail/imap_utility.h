@@ -4,6 +4,7 @@
 #include <imap/c-client.h>
 #include "ferite.h"
 
+void output_printf( int type, char *format, ... );
 
 #define RETURN_IF_NULL(v); if( v == NULL ) return(NULL);
 

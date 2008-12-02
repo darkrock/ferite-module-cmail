@@ -1,10 +1,49 @@
 #include "imap_utility.h"
 
+FeriteScript *output_script = NULL;
+FeriteObject *output_closure = NULL;
+
 char *curhst = NIL;             /* currently connected host */
 char *curusr = NIL;             /* current login user  */
-char *global_pwd;
+char *global_pwd = NULL;
 
-int   debug_cmail_module = 0;
+int   debug_cmail_module = 1;
+
+#define OUTPUT_DEBUG 1
+#define OUTPUT_NORMAL 2
+#define OUTPUT_WARNING 3
+#define OUTPUT_ERROR 4
+
+void output_printf( int type, char *format, ... ) {
+	va_list arguments;
+	
+	va_start( arguments, format );
+	if( output_closure ) {
+		char *msg = NULL;
+		FeriteBuffer *output_buffer = NULL;
+		FeriteVariable **params = NULL;
+		FeriteFunction *function = ferite_object_get_function( output_script, output_closure, "invoke" );
+		FeriteVariable *return_value = NULL;
+		
+		output_buffer = ferite_buffer_new(output_script, 0);
+		ferite_buffer_vprintf( output_script, output_buffer, format, &arguments );
+		msg = ferite_buffer_get( output_script, output_buffer, NULL );
+		
+		params = ferite_create_parameter_list_from_data( output_script, "lc", type, msg, NULL );
+		return_value = ferite_call_function( output_script, output_closure, NULL, function, params );
+		
+		if( return_value ) {
+			ferite_variable_destroy( output_script, return_value );
+		}
+		ferite_delete_parameter_list( output_script, params );
+		ferite_buffer_delete(output_script, output_buffer);
+		ffree_ngc(msg);
+	} else {
+		vprintf(format, arguments);
+		printf("\n");
+	}
+	va_end(arguments);
+}
 
 void set_error_string( FeriteScript *script,  FeriteObject *object, char* str ) {
 	FeriteVariable *estr;
@@ -136,7 +175,7 @@ FeriteVariable *create_ferite_header_object( FeriteScript *script, ENVELOPE *env
 		    }
 		    ferite_object_set_var(script, VAO(header), target[i], v );
 		    if( debug_cmail_module && strcmp( target[i], "subject" ) == 0 ) {
-				printf("module.mail: Processing email with subject: '%s'\n", source[i] );
+				output_printf(OUTPUT_DEBUG,"module.mail: Processing email with subject: '%s'", source[i] );
 		    }
 	    }
     }
@@ -173,7 +212,7 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 
 		v  = fe_new_lng("type",body->type);
 		ferite_object_set_var(script, VAO(object), "type", v);
-		//printf("module.mail: setting type %d\n", body->type);
+		output_printf(OUTPUT_DEBUG,"module.mail: setting type %d", body->type);
 		if( body->subtype ) {
 			v = fe_new_str( "subtype", body->subtype, 0, FE_CHARSET_DEFAULT );
 			ferite_object_set_var( script, VAO(object), "subtype", v );
@@ -217,12 +256,12 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 			switch(body->encoding){
 				case ENCQUOTEDPRINTABLE:
 					if( debug_cmail_module )
-						printf("module.mail: Decoding from encoded quotable\n");
+						output_printf(OUTPUT_DEBUG,"module.mail: Decoding from encoded quotable");
 					buf2 = rfc822_qprint(buf,len,&len2);
 					break;
 				case ENCBASE64: 
 					if( debug_cmail_module )
-						printf("module.mail: Decoding from base64\n");
+						output_printf(OUTPUT_DEBUG,"module.mail: Decoding from base64");
 					buf2=rfc822_base64(buf,len,&len2);
 					break;
 				default: 
@@ -231,15 +270,15 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 			}
 
 			if( debug_cmail_module ) {
-				printf("module.mail: id: %s, description: %s\n", body->id, body->description);
-				printf("module.mail: block type: %d.%s\n", body->type, body->subtype);
+				output_printf(OUTPUT_DEBUG,"module.mail: id: %s, description: %s", body->id, body->description);
+				output_printf(OUTPUT_DEBUG,"module.mail: block type: %d.%s", body->type, body->subtype);
 			}
 			if( body->parameter ) /* Try and get the content type correctly */ {
 				PARAMETER *ptr = body->parameter;
 				while( ptr != NULL ) {
 					if( caseless_compare( ptr->attribute, "charset" ) ) {
 						if( debug_cmail_module )
-							printf("module.mail: Found content type for block: %s\n", ptr->value);
+							output_printf(OUTPUT_DEBUG,"module.mail: Found content type for block: %s", ptr->value);
 						v = fe_new_str("charset", ptr->value, 0, FE_CHARSET_DEFAULT);
 						ferite_object_set_var(script, VAO(object), "charset", v);
 					}
@@ -532,9 +571,6 @@ ENVELOPE *create_imap_envelope( FeriteScript *script, FeriteVariable *header ){
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "ID" );
 	RETURN_IF_NULL(v);
 	env->message_id = cpystr( VAS(v)->data );
-//	RETURN_IF_NULL( env->message_id );
-
-	//Ignore date since c-client generate them
 
 	return env;
 }
@@ -581,44 +617,29 @@ void mm_notify (MAILSTREAM *stream,char *string,long errflg)
 
 void mm_list (MAILSTREAM *stream,int delimiter,char *mailbox,long attributes)
 {
-  putchar (' ');
-  if (delimiter) putchar (delimiter);
-  else fputs ("NIL",stdout);
-  putchar (' ');
-  fputs (mailbox,stdout);
-  if (attributes & LATT_NOINFERIORS) fputs (", no inferiors",stdout);
-  if (attributes & LATT_NOSELECT) fputs (", no select",stdout);
-  if (attributes & LATT_MARKED) fputs (", marked",stdout);
-  if (attributes & LATT_UNMARKED) fputs (", unmarked",stdout);
-  putchar ('\n');
+	if (attributes & LATT_NOINFERIORS) output_printf( OUTPUT_NORMAL, "%c%s, no inferiors", mailbox);
+	if (attributes & LATT_NOSELECT)    output_printf( OUTPUT_NORMAL, "%c%s, no select", mailbox);
+	if (attributes & LATT_MARKED)      output_printf( OUTPUT_NORMAL, "%c%s, marked", mailbox);
+	if (attributes & LATT_UNMARKED)    output_printf( OUTPUT_NORMAL, "%c%s, unmarked", mailbox);
 }
 
 
 void mm_lsub (MAILSTREAM *stream,int delimiter,char *mailbox,long attributes)
 {
-  putchar (' ');
-  if (delimiter) putchar (delimiter);
-  else fputs ("NIL",stdout);
-  putchar (' ');
-  fputs (mailbox,stdout);
-  if (attributes & LATT_NOINFERIORS) fputs (", no inferiors",stdout);
-  if (attributes & LATT_NOSELECT) fputs (", no select",stdout);
-  if (attributes & LATT_MARKED) fputs (", marked",stdout);
-  if (attributes & LATT_UNMARKED) fputs (", unmarked",stdout);
-  putchar ('\n');
+	if (attributes & LATT_NOINFERIORS) output_printf( OUTPUT_NORMAL, "%c%s, no inferiors", mailbox);
+	if (attributes & LATT_NOSELECT)    output_printf( OUTPUT_NORMAL, "%c%s, no select", mailbox);
+	if (attributes & LATT_MARKED)      output_printf( OUTPUT_NORMAL, "%c%s, marked", mailbox);
+	if (attributes & LATT_UNMARKED)    output_printf( OUTPUT_NORMAL, "%c%s, unmarked", mailbox);
 }
 
 
 void mm_status (MAILSTREAM *stream,char *mailbox,MAILSTATUS *status)
 {
-  printf (" Mailbox %s",mailbox);
-  if (status->flags & SA_MESSAGES) printf (", %lu messages",status->messages);
-  if (status->flags & SA_RECENT) printf (", %lu recent",status->recent);
-  if (status->flags & SA_UNSEEN) printf (", %lu unseen",status->unseen);
-  if (status->flags & SA_UIDVALIDITY) printf (", %lu UID validity",
-					      status->uidvalidity);
-  if (status->flags & SA_UIDNEXT) printf (", %lu next UID",status->uidnext);
-  printf ("\n");
+	if (status->flags & SA_MESSAGES)    output_printf( OUTPUT_NORMAL, "Mailbox %s, %lu messages", mailbox, status->messages);
+	if (status->flags & SA_RECENT)      output_printf( OUTPUT_NORMAL, "Mailbox %s, %lu recent", mailbox, status->recent);
+	if (status->flags & SA_UNSEEN)      output_printf( OUTPUT_NORMAL, "Mailbox %s, %lu unseen", mailbox, status->unseen);
+	if (status->flags & SA_UIDVALIDITY) output_printf( OUTPUT_NORMAL, "Mailbox %s, %lu UID validity", mailbox, status->uidvalidity);
+	if (status->flags & SA_UIDNEXT)     output_printf( OUTPUT_NORMAL, "Mailbox %s, %lu next UID", mailbox, status->uidnext);
 }
 
 
@@ -626,24 +647,24 @@ void mm_log (char *string,long errflg)
 {
 	switch ((short) errflg) {
 	case NIL:
-		printf ("[%s]\n",string);
+		output_printf(OUTPUT_NORMAL, "%s", string);
 		break;
 	case PARSE:
 	case WARN:
-		printf ("%%%s\n",string);
+		output_printf(OUTPUT_WARNING, "%s", string);
 		break;
 	case ERROR:
-		printf ("?%s\n",string);
+		output_printf(OUTPUT_ERROR, "%s", string);
 		break;
 	default:
-	  printf ("%s\n",string);
+		output_printf(OUTPUT_NORMAL, "%s", string);
 	}
 }
 
 
 void mm_dlog (char *string)
 {
-	printf("dlog>%s", string);
+	output_printf(OUTPUT_DEBUG,"debug-log: %s", string);
 }
 
 
@@ -682,5 +703,5 @@ long mm_diskerror (MAILSTREAM *stream,long errcode,long serious)
 
 void mm_fatal (char *string)
 {
-  printf ("fatal?%s\n",string);
+	output_printf(OUTPUT_ERROR,"Fatal error: %s", string);
 }
