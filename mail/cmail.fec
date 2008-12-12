@@ -269,10 +269,10 @@ namespace modifies Mail {
 	}
 	
 	function truncateHeaderLine( string line, number extra ) {
-		number maxLength = (998 - String.length("=?${.defaultEncodingTarget}?Q??=") - extra) / (3 * 4);
-		if( line.utf8Length() > maxLength ) {
+		number maxLength = (998 - String.length("=?${.defaultEncodingTarget}?Q??=") - extra);
+		if( line.length() > maxLength ) {
 			string newLine;
-			while( newLine.utf8Length() < maxLength ) {
+			while( ( newLine.length() + line.nextCharacterLength() ) * 3 <= maxLength ) {
 				newLine += line.nextCharacter();
 				line = line[line.nextCharacterLength()..];
 			}
