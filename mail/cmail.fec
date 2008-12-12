@@ -219,7 +219,7 @@ namespace modifies Mail {
 			if( charset != .defaultEncodingTarget ) {
 				real_str = .convertToDefaultEncodingFrom( str, charset );
 			}
-			real_str.blocks(50).each() using ( block ) {
+			real_str.utf8Blocks(10).each() using ( block ) {
 				enc_str += Mail.Connection.bit8( block );
 			};		
 		    enc_str = Regexp.replaceAll( '\ ', enc_str, '_' );
@@ -266,6 +266,19 @@ namespace modifies Mail {
 		html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
 
 		return html;
+	}
+	
+	function truncateHeaderLine( string line, number extra ) {
+		number maxLength = (998 - String.length("=?${.defaultEncodingTarget}?Q??=") - extra) / (3 * 4);
+		if( line.utf8Length() > maxLength ) {
+			string newLine;
+			while( newLine.utf8Length() < maxLength ) {
+				newLine += line.nextCharacter();
+				line = line[line.nextCharacterLength()..];
+			}
+			return newLine;
+		}
+		return line;
 	}
 	
 	/**
@@ -558,7 +571,7 @@ namespace modifies Mail {
 		function sendMessage( string server, object mail ) {
 			object old_header = mail.header;
 			object new_header = old_header.duplicate();
-			string new_subject = Mail.encodeISOString(Regexp.replaceAll('[\r\n]', old_header.subject, ' '));
+			string new_subject = Mail.encodeISOString(Mail.truncateHeaderLine(Regexp.replaceAll('[\r\n]', old_header.subject, ' '), String.length("Subject: ")));
 			
 			boolean result = false;
 			// Encode the headers
