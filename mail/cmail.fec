@@ -1122,7 +1122,7 @@ namespace modifies Mail {
 		string subtype;
 		
 		function constructor(){
-			self.type = Mime.TYPEMULTIPART;
+			self.type = Mail.Mime.TYPEMULTIPART;
 		}
 		
 		/**
