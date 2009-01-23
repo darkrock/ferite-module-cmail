@@ -20,6 +20,14 @@ module-header {
 	extern FeriteObject *output_closure;
 }
 
+module-init {
+	curhst = NULL;
+	curusr = NULL;
+	global_pwd = NULL;
+	output_closure = NULL;
+	output_script = NULL;
+}
+
 /**
  * @namespace Mail
  * @brief     The holding namespace for Mail related tools
@@ -100,7 +108,7 @@ namespace modifies Mail {
 		return (type.toLower() == .defaultEncodingTarget.toLower()) or (.defaultEncodingTargetVariants.valueExists(type.toUpper()));
 	}
 	function convertToDefaultEncodingFrom( string content, string type ) {
-	    object convertor = null;
+		object convertor = null;
 
 		if( .requestedTypeIsTarget(type) and not content.isUTF8() ) {
 			// Special case, if it claims to be UTF-8 and there is no UTF-8 characters within the code, we try to convert it
@@ -109,16 +117,17 @@ namespace modifies Mail {
 			type = .defaultEncodingSource;
 		}
 		
-	    monitor {
+		monitor {
 			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : .defaultEncodingSource));
-	    } handle {
+		} handle {
 			type = ""; //no convertion beacasue we have no convertor..... :/
-	    }
+		}
+		
 		if( not type ) {
 			Mail.output(Mail.OUTPUT_NORMAL,"module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 		}
 
-		if( not .requestedTypeIsTarget(type) ) {
+		if( not (.requestedTypeIsTarget(type) or content.isUTF8()) ) {
 			monitor {
 				return convertor.convert(content);
 			} handle {
