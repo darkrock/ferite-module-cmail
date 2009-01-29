@@ -625,7 +625,7 @@ namespace modifies Mail {
 			}
 
 			stream = smtp_open( hostlist, FE_FALSE); //SOP_TRYSSL
- 
+			
 			if( stream == NULL ) {
 				set_error_string( script, self,"Error opening SMTP stream" );
 				FE_RETURN_FALSE;
@@ -633,6 +633,7 @@ namespace modifies Mail {
 	
 			if( smtp_mail( stream, "MAIL", env, body ) == NIL ) {
 				set_error_string( script, self,"SMTP Error" );
+				output_printf(4, stream->reply);
 				FE_RETURN_FALSE;
 			}
 			smtp_close( stream );
