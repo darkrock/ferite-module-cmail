@@ -1,0 +1,42 @@
+uses "cmail";
+uses "console";
+
+function createTextHTMLContent( string text, string html ) {
+	object text_content = new Mail.MessagePart();
+	object html_content = new Mail.MessagePart();
+	
+	text_content.type = Mail.Mime.TYPETEXT;
+	text_content.subtype = "plain";
+	text_content.content = "This is text";
+	text_content.charset = "UTF-8";
+
+	html_content.type = Mail.Mime.TYPETEXT;
+	html_content.subtype = "html";
+	html_content.content = "<html><body>$html</body></html>";
+	html_content.charset = "UTF-8";
+	
+	content.subtype = "alternative";
+	content.addPart(text_content);
+	content.addPart(html_content);
+	
+	return content;
+}
+
+object message = new Mail.Message();
+object connection = new Mail.Connection();
+
+
+object to = new Mail.Address("ctr","cention.se");
+object from = new Mail.Address("ctr","cention.se");
+from.name = "Chris Ross";
+
+message.header = new Mail.MessageHeader();
+message.header.to.add( to );
+message.header.from.add( from );
+message.header.subject = "This is a test message";
+message.setOutgoingHeader('X-Flag-Crut', 'hi there');
+message.setOutgoingHeader('X-Message-Flag', 'Hey there! Have a look at ferite!');
+
+message.content = createTextHTMLContent('Text', '<B>HTML!</b>');
+
+connection.sendMessage( "relay.plus.net", message );
