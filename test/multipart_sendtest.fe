@@ -7,7 +7,7 @@ function createTextHTMLContent( string text, string html ) {
 	
 	text_content.type = Mail.Mime.TYPETEXT;
 	text_content.subtype = "plain";
-	text_content.content = "This is text";
+	text_content.content = text;
 	text_content.charset = "UTF-8";
 
 	html_content.type = Mail.Mime.TYPETEXT;
