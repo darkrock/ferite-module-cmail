@@ -127,7 +127,7 @@ namespace modifies Mail {
 			Mail.output(Mail.OUTPUT_NORMAL,"module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 		}
 
-		if( not (.requestedTypeIsTarget(type) or content.isUTF8()) ) {
+		if( not (.requestedTypeIsTarget(type) /* or content.isUTF8() */) ) {
 			monitor {
 				return convertor.convert(content);
 			} handle {
