@@ -116,18 +116,19 @@ namespace modifies Mail {
 			Mail.output(Mail.OUTPUT_NORMAL,"Invoking special case: claims UTF-8, no UTF-8 found, attempting convert from ${.defaultEncodingSource}");
 			type = .defaultEncodingSource;
 		}
-		
-		monitor {
-			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, (type ? type : .defaultEncodingSource));
-		} handle {
-			type = ""; //no convertion beacasue we have no convertor..... :/
-		}
-		
+
 		if( not type ) {
 			Mail.output(Mail.OUTPUT_NORMAL,"module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
+			type = .defaultEncodingSource;
 		}
-
-		if( not (.requestedTypeIsTarget(type) /* or content.isUTF8() */) ) {
+		
+		monitor {
+			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, type);
+		} handle {
+			convertor = null; //no convertion beacasue we have no convertor..... :/
+		}
+		
+		if( not (.requestedTypeIsTarget(type)) and convertor ) {
 			monitor {
 				return convertor.convert(content);
 			} handle {
