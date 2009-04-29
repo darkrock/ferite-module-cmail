@@ -303,10 +303,10 @@ namespace modifies Mail {
 		native function constructor() {
 			self->odata = NULL;
 			//set timeout.
-			mail_parameters(NIL, SET_OPENTIMEOUT, (void *)20);
-			mail_parameters(NIL, SET_READTIMEOUT, (void *)10);
-			mail_parameters(NIL, SET_WRITETIMEOUT, (void *)10);
-			mail_parameters(NIL, SET_CLOSETIMEOUT, (void *)10);
+			mail_parameters(NIL, SET_OPENTIMEOUT, (void *)120);
+			mail_parameters(NIL, SET_READTIMEOUT, (void *)120);
+			mail_parameters(NIL, SET_WRITETIMEOUT, (void *)120);
+			mail_parameters(NIL, SET_CLOSETIMEOUT, (void *)120);
 			//set number of login tries.
 			mail_parameters(NIL, SET_MAXLOGINTRIALS, (void *)2);
 
