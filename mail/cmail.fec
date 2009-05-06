@@ -1337,7 +1337,7 @@ namespace modifies Mail {
 				if( attachmentDelivery )
 					return attachmentDelivery.invoke( self );
 			 	else
-					return "attachment://${.fileName()}/type=${Mail.Mime.toString(.type)}:${.subtype}/";
+					return "";
 			} else if( .type == Mail.Mime.TYPETEXT ) {
 				string content = Mail.convertToDefaultEncodingFrom( .content, .charset );
 				if( wantHTML and .subtype.toLower() == 'html' ) {
