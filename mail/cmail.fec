@@ -955,6 +955,10 @@ namespace modifies Mail {
 		function checkEncoding() {
 			.name = Mail.encodeISOString(.name);
 		}
+		function toString() {
+			return "Mail.Address:${.flatName()} <${.flatAddress()}>";
+		}
+		
 	}
 	/**
 	 * @end
@@ -1006,6 +1010,10 @@ namespace modifies Mail {
 			.list.each() using ( address ) {
 				address.checkEncoding();
 			};
+		}
+		
+		function toString() {
+			return "Mail.AddressList:${.list}";
 		}
 	}
 	/**
