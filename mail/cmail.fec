@@ -1246,21 +1246,55 @@ namespace modifies Mail {
 		 * @param string path The path to the file
 		 */
 		function addAttachment(string path){
-		    object regex;
-		    object match;
 			//Fixme check that file is readable
 			object part = new Mail.MessagePart();
 			part.filepath = path;
+			part.filename = File.name(path);
 			part.type = Mail.Mime.TYPEAPPLICATION;
 			part.subtype = "octet-stream";
 			part.encoding = Mail.Encoding.ENCBINARY;
-
-			regex = new Regexp(".*/([^/]+*)$");
-			if( (match = regexp.match(path)) )
-				part.filename = match.match();
-			else
-				part.filename = path; 
-			Array.push(self.parts,part);
+			Array.push(self.parts, part);
+		}
+		/**
+		 * @function embedImage
+		 * @declaration function embedImage(string id, string path)
+		 * @brief Add a given image as a part with an Content-ID that can be referenced
+		 * @param string id The Content-ID the image should have
+		 * @param string path The path to the image
+		 */
+		function embedImage( string id, string path ) {
+			object part;
+			string subtype;
+			object match = Regexp.match('.*\.(.*)', path);
+			if( match ) {
+				switch( match.capture(0) ) {
+					case 'jpeg':
+					case 'jpg':
+					case 'jpe':
+						subtype = 'jpeg';
+						break;
+					case 'gif':
+						subtype = 'gif';
+						break;
+					case 'tiff':
+					case 'tif':
+						subtype = 'tiff';
+						break;
+					case 'png':
+						subtype = 'png';
+						break;
+					case 'bmp':
+						subtype = 'x-ms-bmp';
+						break;
+				}
+			}
+			part = new Mail.MessagePart();
+			part.ID = "<${id}>";
+			part.filepath = path;
+			part.type = Mail.Mime.TYPEIMAGE;
+			part.subtype = subtype;
+			part.encoding = Mail.Encoding.ENCBINARY;
+			Array.push(.parts, part);
 		}
 	}
 	/**
@@ -1273,6 +1307,7 @@ namespace modifies Mail {
 	 */
 	class MessagePart
 	{
+		string ID;
 		number type;
 		string subtype;
 		number encoding;
