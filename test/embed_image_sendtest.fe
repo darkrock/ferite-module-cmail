@@ -1,0 +1,36 @@
+uses "cmail";
+uses "console";
+
+object message = new Mail.Message();
+object connection = new Mail.Connection();
+object content = new Mail.MessageMultiPart();
+object text = new Mail.MessagePart();
+object html = new Mail.MessagePart();
+
+object to = new Mail.Address('tobias', 'cention.se');
+object from = new Mail.Address('tobias', 'cention.se');
+from.name = 'Tobias Eriksson';
+
+message.header = new Mail.MessageHeader();
+message.header.to.add(to);
+message.header.from.add(from);
+message.header.subject = 'This is a test message';
+
+text.type = Mail.Mime.TYPETEXT;
+text.subtype = 'plain';
+text.content = 'Plain text message.';
+text.charset = 'UTF-8';
+
+html.type = Mail.Mime.TYPETEXT;
+html.subtype = 'html';
+html.content = '<html><body><b>HTML message.</b><br><img src="cid:image1" /><br>Some more text.</body></html>';
+html.charset = 'UTF-8';
+
+content.addPart(text);
+content.addPart(html);
+content.embedImage('image1', '/home/tobias/Desktop/image.png');
+
+content.subtype = 'related';
+message.content = content;
+
+connection.sendMessage('mail.cention.se', message);
