@@ -22,7 +22,7 @@ modxml_DATA      = cmail.xml
 modxmldir        = @FE_LIBRARY_PATH@/module-descriptions
 
 
-EXTRA_DIST       = cmail.fec $(scripts_DATA)
+EXTRA_DIST       = $(scripts_DATA) $(modxml_DATA)
 pkgdir           = @FE_NATIVE_LIBRARY_PATH@
 pkg_LTLIBRARIES  = cmail.la
 
