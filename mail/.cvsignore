@@ -1,0 +1,9 @@
+.deps
+.libs
+Makefile
+Makefile.in
+*.la
+cmail_*.c
+cmail_*.lo
+cmail_*.h
+*.lo
