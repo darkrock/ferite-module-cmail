@@ -251,13 +251,13 @@ namespace modifies Mail {
 	function stripHTML( string html ) {
 	    number i = 0;
 	    string result; 
-	    array entities = [ ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"] ];
+	    array entities = [ ["quot", "\""], ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"] ];
 
 	    result = self.stripTags(html);
 	    if(result != html ) {
 			for(i = 0; i < Array.size(entities); i++) {
-			    regex = new Regexp("(&" + entities[i][0] + ";)", "igx");
-			    result = regex.replaceAll(result, entities[i][1]);
+				object regex = new Regexp("(&" + entities[i][0] + ";)", "igx");
+				result = regex.replaceAll(result, entities[i][1]);
 			}
 	    }
 	    return result;
@@ -267,16 +267,18 @@ namespace modifies Mail {
 		string emailAddress = '(([A-Za-z0-9]+)\.?)+@(([A-Za-z0-9]+)\.?)+';
 		object capture_email = new Regexp("<($emailAddress)>");
 		object strip_comment = new Regexp("<!--.*?-->", 's');
-		object strip_tag = new Regexp("</?.*?>");
+		object strip_tag = new Regexp("</?.*?>", 's');
 		object compress_whitespace = new Regexp('[ \t]+');
-		object br_replace = new Regexp("<br */?>", "gxi");
+		object br_replace = new Regexp("<br */?>", "gi");
 
+		html = Regexp.replaceAll("\r?\n", html, '');
 	    html = br_replace.replaceAll(html, "\n");
 		html = capture_email.replaceAll(html, '\1');
 		html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
 
 		return html;
 	}
+
 	
 	function truncateHeaderLine( string line, number extra ) {
 		number maxLength = (998 - String.length("=?${.defaultEncodingTarget}?Q??=") - extra);
