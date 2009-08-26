@@ -340,21 +340,16 @@ FeriteVariable *create_ferite_mail_object( FeriteScript *script, FeriteVariable 
     return mailobject;
 }
 
-
-
 BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 	BODY *body = NULL;
 	FeriteVariable *v = NULL;
 
-
 	body =  mail_newbody();
-
 
 	// fixme NULL/0 ?
 	v = ferite_hash_get(script,VAO(leaf)->variables->variables,"encoding");
 	RETURN_IF_NULL(v);
 	body->encoding=VAI(v);
-
 
 	v = ferite_hash_get( script, VAO(leaf)->variables->variables, "content");
 	RETURN_IF_NULL(v);
@@ -363,7 +358,6 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 	body->contents.text.data =strdup(VAS(v)->data);
 	body->contents.text.size =strlen(VAS(v)->data); //fixme
 
-
 	v = ferite_hash_get( script, VAO(leaf)->variables->variables, "type" );
 	RETURN_IF_NULL(v);
 	body->type=VAI(v);
@@ -371,12 +365,6 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 	v = ferite_hash_get(script,VAO(leaf)->variables->variables,"subtype");
 	RETURN_IF_NULL(v);
 	body->subtype=cpystr( VAS(v)->data );
-
-	v = ferite_hash_get(script, VAO(leaf)->variables->variables, "ID");
-	RETURN_IF_NULL(v);
-	if( strlen(VAS(v)->data) ) {
-		body->id = cpystr(VAS(v)->data);
-	}
 
 	v  = ferite_hash_get(script,VAO(leaf)->variables->variables,"filename");
 	RETURN_IF_NULL(v);
@@ -399,8 +387,9 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 
 		fd = open(VAS(v)->data,O_RDONLY);
 		if( fd == -1 ) {
-			//set_error_string( script, self, "Couldn't open file" );
-			return NULL;
+			char buffer[2048];
+			sprintf(buffer, "Unable to create email content leaf, unable to open file: %s", VAS(v)->data);
+			ERROR_IF_NULL(v, script, buffer);
 		}
 		size=lseek(fd,0,SEEK_END);
 		lseek(fd,0,SEEK_SET);
@@ -463,8 +452,8 @@ BODY *create_imap_content_object(FeriteScript* script, FeriteVariable* fe_parent
 		RETURN_IF_NULL(fe_child);
 
 		// Is it a multipart or a leaf?
-                if( ferite_hash_get( script, VAO(fe_child)->variables->variables, "parts"))
-                        new_body = create_imap_content_object( script , fe_child );
+		if( ferite_hash_get( script, VAO(fe_child)->variables->variables, "parts"))
+			new_body = create_imap_content_object( script , fe_child );
 		else
 			new_body = create_imap_content_leaf( script, fe_child );
 		RETURN_IF_NULL(new_body);
@@ -526,54 +515,54 @@ ENVELOPE *create_imap_envelope( FeriteScript *script, FeriteVariable *header ){
 	int i;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "to" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find to address");
 	a = create_imap_address( script, v );
 	if(a)
 		env->to = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "from" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find from address");
 	a = create_imap_address( script, v );
 	if(a)
 		env->from = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "cc" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find cc address");
 	a = create_imap_address( script, v );
 	if(a)
 		env->cc = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "bcc" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find bcc address");
 	a = create_imap_address( script, v );
 	if(a)
 		env->bcc = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "from" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find create return path");
 	a = create_imap_address( script, v );
 	if(a)
 		env->return_path = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "sender" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find sender");
 	a = create_imap_address( script, v );
 	if(a)
 		env->sender = a;
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "subject" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find subject");
 	env->subject = cpystr( VAS(v)->data );
 	RETURN_IF_NULL( env->subject );
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "in_reply_to" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find in reply to header");
 	env->in_reply_to = cpystr( VAS(v)->data );
 	RETURN_IF_NULL( env->in_reply_to );
 
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "ID" );
-	RETURN_IF_NULL(v);
+	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find proposed message id");
 	env->message_id = cpystr( VAS(v)->data );
 
 	return env;

@@ -7,6 +7,7 @@
 void output_printf( int type, char *format, ... );
 
 #define RETURN_IF_NULL(v); if( v == NULL ) return(NULL);
+#define ERROR_IF_NULL(v, script, message) if( v == NULL ) { ferite_error( script, 0, "Mail Module: %s\n", message ); return (NULL); }
 
 BODY *create_imap_content_object(FeriteScript* script, FeriteVariable* fe_parent);
 BODY *create_imap_content_leaf(FeriteScript* script, FeriteVariable* fe_parent);
