@@ -389,7 +389,7 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 		if( fd == -1 ) {
 			char buffer[2048];
 			sprintf(buffer, "Unable to create email content leaf, unable to open file: %s", VAS(v)->data);
-			ERROR_IF_NULL(v, script, buffer);
+			ERROR_IF_NULL(NULL, script, buffer);
 		}
 		size=lseek(fd,0,SEEK_END);
 		lseek(fd,0,SEEK_SET);
