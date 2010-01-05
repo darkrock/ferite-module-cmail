@@ -251,13 +251,14 @@ namespace modifies Mail {
 	function stripHTML( string html ) {
 	    number i = 0;
 	    string result; 
-	    array entities = [ ["quot", "\""], ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"] ];
+	    array entities = [ ["quot", "\""], ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"],
+	                       ["auml", "ä"], ["ouml", "ö"], ["aring", "å"], ["Auml", "Ä"], ["Ouml", "Ö"], ["Aring", "Å"] ];
 
 	    result = self.stripTags(html);
 	    if(result != html ) {
 			for(i = 0; i < Array.size(entities); i++) {
-				object regex = new Regexp("(&" + entities[i][0] + ";)", "igx");
-				result = regex.replaceAll(result, entities[i][1]);
+				object r = new Regexp("(&" + entities[i][0] + ";)", "igx");
+				result = r.replaceAll(result, entities[i][1]);
 			}
 	    }
 	    return result;
