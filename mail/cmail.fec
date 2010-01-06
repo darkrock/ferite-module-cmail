@@ -582,11 +582,29 @@ namespace modifies Mail {
 		 * @return true on success, fales otherwise
 		 */
 		function sendMessage( string server, object mail ) {
+			return .sendMessage( server, '', '', false, mail );
+		}
+		/**
+		 * @function sendMessage
+		 * @declaration function sendMessage( string _server, string usernane, string password, boolean ssl, object mail )
+		 * @brief With a given Mail.Message object, send the email using the supplied SMTP server paying attention to the authentication details provided
+		 * @warning This function will automatically ISO encode headers, names and the subject of the email if it needs to be done.
+					The change will not be reflected when the function has returned. This means you need not worry about correct ISO
+					string escaping for the various parts of the email - just assign strings and away you go.
+		 * @param string _server The SMTP host to connect to
+		 * @param string usernane The username to use, leave blank if you do not want authentication
+		 * @param string password The password to use with the username name, leave blank if you do not want authentication
+		 * @param boolean ssl Whether the connection should be done over SSL, false if SSL is not desired
+		 * @param object mail The Mail.Message object to send
+		 * @return true on success, false otherwise
+		 */
+		function sendMessage( string _server, string usernane, string password, boolean ssl, object mail ) {
 			object old_header = mail.header;
 			object new_header = old_header.duplicate();
 			string new_subject = Mail.encodeISOString(Mail.truncateHeaderLine(Regexp.replaceAll('[\r\n]', old_header.subject, ' '), String.length("Subject: ")));
-			
+			string server = _server;
 			boolean result = false;
+
 			// Encode the headers
 			mail.outgoingHeaders.map() using ( key, value ) {
 				new_subject += "\r\n$key: ${Mail.encodeISOString(value)}";
@@ -596,18 +614,23 @@ namespace modifies Mail {
 			new_header.checkEncoding();
 			// Swap out the old header
 			mail.header = new_header;
-			result = .__sendMessage( server, mail );
+
+			server = _server + (ssl ? "/ssl/novalidate-cert" : "") + (username ? "/user=$username" : "");
+
+			result = .__sendMessage( server, password, mail );
 			// Bring back the old header
 			mail.header = old_header;
 			return result;
 		}
-		native function __sendMessage( string server, object mailet ) {
+		native function __sendMessage( string server, string password, object mailet ) {
 			FeriteVariable *content = NULL, *header = NULL;
 			ENVELOPE *env = NULL;
 			BODY *body = NULL;
 			SENDSTREAM *stream = NULL;
-
 			char *hostlist[] = { server->data, NIL };
+
+			// Set the password
+			global_pwd = password->data;
 			
 			header  = ferite_hash_get(script,mailet->variables->variables,"header");
 			content = ferite_hash_get(script,mailet->variables->variables,"content");
