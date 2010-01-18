@@ -598,7 +598,7 @@ namespace modifies Mail {
 		 * @param object mail The Mail.Message object to send
 		 * @return true on success, false otherwise
 		 */
-		function sendMessage( string _server, string usernane, string password, boolean ssl, object mail ) {
+		function sendMessage( string _server, string username, string password, boolean ssl, object mail ) {
 			object old_header = mail.header;
 			object new_header = old_header.duplicate();
 			string new_subject = Mail.encodeISOString(Mail.truncateHeaderLine(Regexp.replaceAll('[\r\n]', old_header.subject, ' '), String.length("Subject: ")));
