@@ -26,6 +26,8 @@ module-init {
 	global_pwd = NULL;
 	output_closure = NULL;
 	output_script = NULL;
+	
+	ssl_onceonlyinit();
 }
 
 /**
@@ -615,7 +617,7 @@ namespace modifies Mail {
 			// Swap out the old header
 			mail.header = new_header;
 
-			server = _server + (ssl ? "/ssl/novalidate-cert" : "") + (username ? "/user=$username" : "");
+			server = _server + (ssl ? "/ssl/novalidate-cert" : "/novalidate-cert/notls") + (username ? "/authuser=$username" : "");
 
 			result = .__sendMessage( server, password, mail );
 			// Bring back the old header
