@@ -1414,7 +1414,7 @@ namespace modifies Mail {
 				if( wantHTML and .subtype.toLower() == 'html' ) {
 					return content;
 				} else if( not wantHTML and .subtype.toLower() == 'plain' ) {
-				    return Regexp.replaceAll('<(.*@.*?)>', content, '\1');
+				    return Regexp.replaceAll('<(.*?@.*?)>', content, '\1');
 				}
 			}
 			return '';
