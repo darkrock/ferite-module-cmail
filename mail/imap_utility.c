@@ -291,6 +291,11 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 			v = fe_new_lng("encoding", body->encoding );
 			ferite_object_set_var(script, VAO(object), "encoding", v );
 
+			if( body->id ) {
+				v = fe_new_str("ID", body->id, strlen(body->id), FE_CHARSET_DEFAULT);
+				ferite_object_set_var(script, VAO(object), "ID", v);
+			}
+			
 			if( body->disposition.type && strcasecmp(body->disposition.type, "attachment") == 0) {
 				param = body->disposition.parameter;
 				while(param){
