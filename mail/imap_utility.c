@@ -373,7 +373,9 @@ BODY*  create_imap_content_leaf( FeriteScript *script, FeriteVariable *leaf ){
 
 	v = ferite_hash_get(script,VAO(leaf)->variables->variables,"ID");
 	RETURN_IF_NULL(v);
-	body->id=cpystr( VAS(v)->data );
+	if( VAS(v)->length > 0 ) {
+		body->id = cpystr( VAS(v)->data );
+	}
 
 	v  = ferite_hash_get(script,VAO(leaf)->variables->variables,"filename");
 	RETURN_IF_NULL(v);

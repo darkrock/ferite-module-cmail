@@ -1319,6 +1319,7 @@ namespace modifies Mail {
 			part = new Mail.MessagePart();
 			part.ID = "<${id}>";
 			part.filepath = path;
+			part.filename = File.name(path);
 			part.type = Mail.Mime.TYPEIMAGE;
 			part.subtype = subtype;
 			part.encoding = Mail.Encoding.ENCBINARY;
