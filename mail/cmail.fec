@@ -251,35 +251,10 @@ namespace modifies Mail {
 	 * @return A stripped string
 	 */
 	function stripHTML( string html ) {
-	    number i = 0;
-	    string result; 
-	    array entities = [ ["quot", "\""], ["nbsp"," "],[ "amp","&"], ["apos","'"],["lt","<"],["lt","<"], ["gt",">"],["lt","<"],["lt","<"],
-	                       ["auml", "ä"], ["ouml", "ö"], ["aring", "å"], ["Auml", "Ä"], ["Ouml", "Ö"], ["Aring", "Å"] ];
-
-	    result = self.stripTags(html);
-	    if(result != html ) {
-			for(i = 0; i < Array.size(entities); i++) {
-				object r = new Regexp("(&" + entities[i][0] + ";)", "igx");
-				result = r.replaceAll(result, entities[i][1]);
-			}
-	    }
-	    return result;
+	    return Mail.HTML.stripHTML(html);
 	}
-
 	function stripTags( string html ) {
-		string emailAddress = '(([A-Za-z0-9]+)\.?)+@(([A-Za-z0-9]+)\.?)+';
-		object capture_email = new Regexp("<($emailAddress)>");
-		object strip_comment = new Regexp("<!--.*?-->", 's');
-		object strip_tag = new Regexp("</?.*?>", 's');
-		object compress_whitespace = new Regexp('[ \t]+');
-		object br_replace = new Regexp("<br */?>", "gi");
-
-		html = Regexp.replaceAll("\r?\n", html, '');
-	    html = br_replace.replaceAll(html, "\n");
-		html = capture_email.replaceAll(html, '\1');
-		html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
-
-		return html;
+		return Mail.HTML.stripTags(html);
 	}
 
 	
@@ -1468,7 +1443,296 @@ namespace modifies Mail {
 	}
 	/**
 	 * @end
-	 */	
+	 */
+
+	/**
+	 * @class HTML
+	 * @brief Class with static functions to help handle HTML emails
+	 */
+	class HTML {
+		static array entities;
+		static constructor {
+			.entities = [
+				'\#34'   => '"',  'quot'   => '"',  // quotation mark
+				'\#39'   => '\'', 'apos'   => '\'', // apostrophe
+				'\#38'   => '',   'amp'    => '&',  // ampersand
+				'\#60'   => '<',  'lt'     => '<',  // less-than
+				'\#62'   => '>',  'gt'     => '>',  // greater-than
+				'\#160'  => ' ',  'nbsp'   => ' ',  // non-breaking space
+				'\#161'  => '¡',  'iexcl'  => '¡',  // inverted exclamation mark
+				'\#162'  => '¢',  'cent'   => '¢',  // cent
+				'\#163'  => '£',  'pound'  => '£',  // pound
+				'\#164'  => '¤',  'curren' => '¤',  // currency
+				'\#165'  => '¥',  'yen'    => '¥',  // yen
+				'\#166'  => '¦',  'brvbar' => '¦',  // broken vertical bar
+				'\#167'  => '§',  'sect'   => '§',  // section
+				'\#168'  => '¨',  'uml'    => '¨',  // spacing diaeresis
+				'\#169'  => '©',  'copy'   => '©',  // copyright
+				'\#170'  => 'ª',  'ordf'   => 'ª',  // feminine ordinal indicator
+				'\#171'  => '«',  'laquo'  => '«',  // angle quotation mark (left)
+				'\#172'  => '¬',  'not'    => '¬',  // negation
+				'\#173'  => '­',   'shy'    => '­',   // soft hyphen
+				'\#174'  => '®',  'reg'    => '®',  // registered trademark
+				'\#175'  => '¯',  'macr'   => '¯',  // spacing macron
+				'\#176'  => '°',  'deg'    => '°',  // degree
+				'\#177'  => '±',  'plusmn' => '±',  // plus-or-minus
+				'\#178'  => '²',  'sup2'   => '²',  // superscript 2
+				'\#179'  => '³',  'sup3'   => '³',  // superscript 3
+				'\#180'  => '´',  'acute'  => '´',  // spacing acute
+				'\#181'  => 'µ',  'micro'  => 'µ',  // micro
+				'\#182'  => '¶',  'para'   => '¶',  // paragraph
+				'\#183'  => '·',  'middot' => '·',  // middle dot
+				'\#184'  => '¸',  'cedil'  => '¸',  // spacing cedilla
+				'\#185'  => '¹',  'sup1'   => '¹',  // superscript 1
+				'\#186'  => 'º',  'ordm'   => 'º',  // masculine ordinal indicator
+				'\#187'  => '»',  'raquo'  => '»',  // angle quotation mark (right)
+				'\#188'  => '¼',  'frac14' => '¼',  // fraction 1/4
+				'\#189'  => '½',  'frac12' => '½',  // fraction 1/2
+				'\#190'  => '¾',  'frac34' => '¾',  // fraction 3/4
+				'\#191'  => '¿',  'iquest' => '¿',  // inverted question mark
+				'\#215'  => '×',  'times'  => '×',  // multiplication
+				'\#247'  => '÷',  'divide' => '÷',  // division
+				'\#192'  => 'À',  'Agrave' => 'À',  // capital a, grave accent
+				'\#193'  => 'Á',  'Aacute' => 'Á',  // capital a, acute accent
+				'\#194'  => 'Â',  'Acirc'  => 'Â',  // capital a, circumflex accent
+				'\#195'  => 'Ã',  'Atilde' => 'Ã',  // capital a, tilde
+				'\#196'  => 'Ä',  'Auml'   => 'Ä',  // capital a, umlaut mark
+				'\#197'  => 'Å',  'Aring'  => 'Å',  // capital a, ring
+				'\#198'  => 'Æ',  'AElig'  => 'Æ',  // capital ae
+				'\#199'  => 'Ç',  'Ccedil' => 'Ç',  // capital c, cedilla
+				'\#200'  => 'È',  'Egrave' => 'È',  // capital e, grave accent
+				'\#201'  => 'É',  'Eacute' => 'É',  // capital e, acute accent
+				'\#202'  => 'Ê',  'Ecirc'  => 'Ê',  // capital e, circumflex accent
+				'\#203'  => 'Ë',  'Euml'   => 'Ë',  // capital e, umlaut mark
+				'\#204'  => 'Ì',  'Igrave' => 'Ì',  // capital i, grave accent
+				'\#205'  => 'Í',  'Iacute' => 'Í',  // capital i, acute accent
+				'\#206'  => 'Î',  'Icirc'  => 'Î',  // capital i, circumflex accent
+				'\#207'  => 'Ï',  'Iuml'   => 'Ï',  // capital i, umlaut mark
+				'\#208'  => 'Ð',  'ETH'    => 'Ð',  // capital eth, Icelandic
+				'\#209'  => 'Ñ',  'Ntilde' => 'Ñ',  // capital n, tilde
+				'\#210'  => 'Ò',  'Ograve' => 'Ò',  // capital o, grave accent
+				'\#211'  => 'Ó',  'Oacute' => 'Ó',  // capital o, acute accent
+				'\#212'  => 'Ô',  'Ocirc'  => 'Ô',  // capital o, circumflex accent
+				'\#213'  => 'Õ',  'Otilde' => 'Õ',  // capital o, tilde
+				'\#214'  => 'Ö',  'Ouml'   => 'Ö',  // capital o, umlaut mark
+				'\#216'  => 'Ø',  'Oslash' => 'Ø',  // capital o, slash
+				'\#217'  => 'Ù',  'Ugrave' => 'Ù',  // capital u, grave accent
+				'\#218'  => 'Ú',  'Uacute' => 'Ú',  // capital u, acute accent
+				'\#219'  => 'Û',  'Ucirc'  => 'Û',  // capital u, circumflex accent
+				'\#220'  => 'Ü',  'Uuml'   => 'Ü',  // capital u, umlaut mark
+				'\#221'  => 'Ý',  'Yacute' => 'Ý',  // capital y, acute accent
+				'\#222'  => 'Þ',  'THORN'  => 'Þ',  // capital THORN, Icelandic
+				'\#223'  => 'ß',  'szlig'  => 'ß',  // small sharp s, German
+				'\#224'  => 'à',  'agrave' => 'à',  // small a, grave accent
+				'\#225'  => 'á',  'aacute' => 'á',  // small a, acute accent
+				'\#226'  => 'â',  'acirc'  => 'â',  // small a, circumflex accent
+				'\#227'  => 'ã',  'atilde' => 'ã',  // small a, tilde
+				'\#228'  => 'ä',  'auml'   => 'ä',  // small a, umlaut mark
+				'\#229'  => 'å',  'aring'  => 'å',  // small a, ring
+				'\#230'  => 'æ',  'aelig'  => 'æ',  // small ae
+				'\#231'  => 'ç',  'ccedil' => 'ç',  // small c, cedilla
+				'\#232'  => 'è',  'egrave' => 'è',  // small e, grave accent
+				'\#233'  => 'é',  'eacute' => 'é',  // small e, acute accent
+				'\#234'  => 'ê',  'ecirc'  => 'ê',  // small e, circumflex accent
+				'\#235'  => 'ë',  'euml'   => 'ë',  // small e, umlaut mark
+				'\#236'  => 'ì',  'igrave' => 'ì',  // small i, grave accent
+				'\#237'  => 'í',  'iacute' => 'í',  // small i, acute accent
+				'\#238'  => 'î',  'icirc'  => 'î',  // small i, circumflex accent
+				'\#239'  => 'ï',  'iuml'   => 'ï',  // small i, umlaut mark
+				'\#240'  => 'ð',  'eth'    => 'ð',  // small eth, Icelandic
+				'\#241'  => 'ñ',  'ntilde' => 'ñ',  // small n, tilde
+				'\#242'  => 'ò',  'ograve' => 'ò',  // small o, grave accent
+				'\#243'  => 'ó',  'oacute' => 'ó',  // small o, acute accent
+				'\#244'  => 'ô',  'ocirc'  => 'ô',  // small o, circumflex accent
+				'\#245'  => 'õ',  'otilde' => 'õ',  // small o, tilde
+				'\#246'  => 'ö',  'ouml'   => 'ö',  // small o, umlaut mark
+				'\#248'  => 'ø',  'oslash' => 'ø',  // small o, slash
+				'\#249'  => 'ù',  'ugrave' => 'ù',  // small u, grave accent
+				'\#250'  => 'ú',  'uacute' => 'ú',  // small u, acute accent
+				'\#251'  => 'û',  'ucirc'  => 'û',  // small u, circumflex accent
+				'\#252'  => 'ü',  'uuml'   => 'ü',  // small u, umlaut mark
+				'\#253'  => 'ý',  'yacute' => 'ý',  // small y, acute accent
+				'\#254'  => 'þ',  'thorn'  => 'þ',  // small thorn, Icelandic
+				'\#255'  => 'ÿ',  'yuml'   => 'ÿ',  // small y, umlaut mark
+				'\#8704' => '∀',  'forall' => '∀', // for all
+				'\#8706' => '∂',  'part'   => '∂',  // part
+				'\#8707' => '∃',  'exist'  => '∃',  // exists
+				'\#8709' => '∅',  'empty'  => '∅',  // empty
+				'\#8711' => '∇',  'nabla'  => '∇', // nabla
+				'\#8712' => '∈',  'isin'   => '∈',  // isin
+				'\#8713' => '∉',  'notin' => '∉', // notin
+				'\#8715' => '∋',  'ni'    => '∋', // ni
+				'\#8719' => '∏',  'prod'  => '∏',  // prod
+				'\#8721' => '∑',  'sum'    => '∑', // sum
+				'\#8722' => '−',  'minus'  => '−',  // minus
+				'\#8727' => '∗',  'lowast' => '∗', // lowast
+				'\#8730' => '√',  'radic'  => '√',  // square root
+				'\#8733' => '∝',  'prop'   => '∝', // proportional to
+				'\#8734' => '∞',  'infin'  => '∞',  // infinity
+				'\#8736' => '∠',  'ang'   => '∠', // angle
+				'\#8743' => '∧',  'and'    => '∧',  // and
+				'\#8744' => '∨',  'or'     => '∨',  // or
+				'\#8745' => '∩',  'cap'    => '∩',  // cap
+				'\#8746' => '∪',  'cup'    => '∪',  // cup
+				'\#8747' => '∫',  'int'    => '∫',  // integral
+				'\#8756' => '∴',  'there4' => '∴', // therefore
+				'\#8764' => '∼',  'sim'   => '∼', // similar to
+				'\#8773' => '≅',  'cong'  => '≅', // congruent to
+				'\#8776' => '≈',  'asymp'  => '≈',  // almost equal
+				'\#8800' => '≠',  'ne'     => '≠',  // not equal
+				'\#8801' => '≡',  'equiv'  => '≡',  // equivalent
+				'\#8804' => '≤',  'le'     => '≤',  // less or equal
+				'\#8805' => '≥',  'ge'     => '≥',  // greater or equal
+				'\#8834' => '⊂',  'sub'   => '⊂', // subset of
+				'\#8835' => '⊃',  'sup'   => '⊃', // superset of
+				'\#8836' => '⊄',  'nsub'  => '⊄', // not subset of
+				'\#8838' => '⊆',  'sube'  => '⊆', // subset or equal
+				'\#8839' => '⊇',  'supe'  => '⊇', // superset or equal
+				'\#8853' => '⊕',  'oplus' => '⊕', // circled plus
+				'\#8855' => '⊗',  'otimes' => '⊗', // cirled times
+				'\#8869' => '⊥',  'perp'  => '⊥', // perpendicular
+				'\#8901' => '⋅',  'sdot'   => '⋅',  // dot operator
+				'\#913'  => 'Α',  'Alpha'  => 'Α', // Alpha
+				'\#914'  => 'Β',  'Beta'   => 'Β', // Beta
+				'\#915'  => 'Γ',  'Gamma'  => 'Γ', // Gamma
+				'\#916'  => 'Δ',  'Delta'  => 'Δ', // Delta
+				'\#917'  => 'Ε',  'Epsilon' => 'Ε', // Epsilon
+				'\#918'  => 'Ζ',  'Zeta'   => 'Ζ', // Zeta
+				'\#919'  => 'Η',  'Eta'    => 'Η', // Eta
+				'\#920'  => 'Θ',  'Theta'  => 'Θ', // Theta
+				'\#921'  => 'Ι',  'Iota'   => 'Ι', // Iota
+				'\#922'  => 'Κ',  'Kappa'  => 'Κ', // Kappa
+				'\#923'  => 'Λ',  'Lambda' => 'Λ', // Lambda
+				'\#924'  => 'Μ',  'Mu'     => 'Μ', // Mu
+				'\#925'  => 'Ν',  'Nu'     => 'Ν', // Nu
+				'\#926'  => 'Ξ',  'Xi'     => 'Ξ', // Xi
+				'\#927'  => 'Ο',  'Omicron' => 'Ο', // Omicron
+				'\#928'  => 'Π',  'Pi'     => 'Π', // Pi
+				'\#929'  => 'Ρ',  'Rho'    => 'Ρ', // Rho
+				'\#931'  => 'Σ',  'Sigma'  => 'Σ', // Sigma
+				'\#932'  => 'Τ',  'Tau'    => 'Τ', // Tau
+				'\#933'  => 'Υ',  'Upsilon' => 'Υ', // Upsilon
+				'\#934'  => 'Φ',  'Phi'    => 'Φ', // Phi
+				'\#935'  => 'Χ',  'Chi'    => 'Χ', // Chi
+				'\#936'  => 'Ψ',  'Psi'    => 'Ψ', // Psi
+				'\#937'  => 'Ω',  'Omega'  => 'Ω', // Omega
+				'\#945'  => 'α',  'alpha'  => 'α', // alpha
+				'\#946'  => 'β',  'beta'   => 'β', // beta
+				'\#947'  => 'γ',  'gamma'  => 'γ', // gamma
+				'\#948'  => 'δ',  'delta'  => 'δ', // delta
+				'\#949'  => 'ε',  'epsilon' => 'ε', // epsilon
+				'\#950'  => 'ζ',  'zeta'   => 'ζ', // zeta
+				'\#951'  => 'η',  'eta'    => 'η', // eta
+				'\#952'  => 'θ',  'theta'  => 'θ', // theta
+				'\#953'  => 'ι',  'iota'   => 'ι', // iota
+				'\#954'  => 'κ',  'kappa'  => 'κ', // kappa
+				'\#955'  => 'λ',  'lambda' => 'λ', // lambda
+				'\#956'  => 'μ',  'mu'     => 'μ', // mu
+				'\#957'  => 'ν',  'nu'     => 'ν', // nu
+				'\#958'  => 'ξ',  'xi'     => 'ξ', // xi
+				'\#959'  => 'ο',  'omicron' => 'ο', // omicron
+				'\#960'  => 'π',  'pi'     => 'π', // pi
+				'\#961'  => 'ρ',  'rho'    => 'ρ', // rho
+				'\#962'  => 'ς',  'sigmaf' => 'ς', // sigmaf
+				'\#963'  => 'σ',  'sigma'  => 'σ', // sigma
+				'\#964'  => 'τ',  'tau'    => 'τ', // tau
+				'\#965'  => 'υ',  'upsilon' => 'υ', // upsilon
+				'\#966'  => 'φ',  'phi'    => 'φ', // phi
+				'\#967'  => 'χ',  'chi'    => 'χ', // chi
+				'\#968'  => 'ψ',  'psi'    => 'ψ', // psi
+				'\#969'  => 'ω',  'omega'  => 'ω', // omega
+				'\#977'  => 'ϑ',  'thetasym' => 'ϑ', // theta symbol
+				'\#978'  => 'ϒ',  'upsih'  => 'ϒ', // upsilon symbol
+				'\#982'  => 'ϖ',  'piv'    => 'ϖ', // pi symbol
+				'\#338'  => 'Œ',  'OElig'   => 'Œ', // capital ligature OE
+				'\#339'  => 'œ',  'oelig'   => 'œ', // small ligature oe
+				'\#352'  => 'Š',  'Scaron'  => 'Š', // capital S with caron
+				'\#353'  => 'š',  'scaron'  => 'š', // small S with caron
+				'\#376'  => 'Ÿ',  'Yuml'    => 'Ÿ', // capital Y with diaeres
+				'\#402'  => 'ƒ',  'fnof'    => 'ƒ', // f with hook
+				'\#710'  => 'ˆ',  'circ'    => 'ˆ', // modifier letter circumflex accent
+				'\#732'  => '˜',  'tilde'   => '˜', // small tilde
+				'\#8194' => ' ',  'ensp'    => ' ', // en space
+				'\#8195' => ' ',  'emsp'    => ' ', // em space
+				'\#8201' => ' ',  'thinsp'  => ' ', // thin space
+				'\#8204' => '‌',   'zwnj'    => '‌', // zero width non-joiner
+				'\#8205' => '‍',   'zwj'     => '‍', // zero width joiner
+				'\#8211' => '–',  'ndash'   => '–', // en dash
+				'\#8212' => '—',  'mdash'   => '—', // em dash
+				'\#8216' => '‘',  'lsquo'   => '‘', // left single quotation mark
+				'\#8217' => '’',  'rsquo'   => '’', // right single quotation mark
+				'\#8218' => '‚',  'sbquo'   => '‚', // single low-9 quotation mark
+				'\#8220' => '“',  'ldquo'   => '“', // left double quotation mark
+				'\#8221' => '”',  'rdquo'   => '”', // right double quotation mark
+				'\#8222' => '„',  'bdquo'   => '„', // double low-9 quotation mark
+				'\#8224' => '†',  'dagger'  => '†', // dagger
+				'\#8225' => '‡',  'Dagger'  => '‡', // double dagger
+				'\#8226' => '•',  'bull'    => '•', // bullet
+				'\#8230' => '…',  'hellip'  => '…', // horizontal ellipsis
+				'\#8240' => '‰',  'permil'  => '‰', // per mille
+				'\#8242' => '′',  'prime'   => '′', // minutes
+				'\#8243' => '″',  'Prime'   => '″', // seconds
+				'\#8249' => '‹',  'lsaquo'  => '‹', // single left angle quotation
+				'\#8250' => '›',  'rsaquo'  => '›', // single right angle quotation
+				'\#8254' => '‾',  'oline'   => '‾', // overline
+				'\#8364' => '€',  'euro'    => '€', // euro
+				'\#8482' => '™',  'trade'   => '™', // trademark
+				'\#8592' => '←',  'larr'    => '←', // left arrow
+				'\#8593' => '↑',  'uarr'    => '↑', // up arrow
+				'\#8594' => '→',  'rarr'    => '→', // right arrow
+				'\#8595' => '↓',  'darr'    => '↓', // down arrow
+				'\#8596' => '↔',  'harr'    => '↔', // left right arrow
+				'\#8629' => '↵',  'crarr'   => '↵', // carriage return arrow
+				'\#8968' => '⌈',  'lceil'   => '⌈', // left ceiling
+				'\#8969' => '⌉',  'rceil'   => '⌉', // right ceiling
+				'\#8970' => '⌊',  'lfloor'  => '⌊', // left floor
+				'\#8971' => '⌋',  'rfloor'  => '⌋', // right floor
+				'\#9674' => '◊',  'loz'     => '◊', // lozenge
+				'\#9824' => '♠',  'spades'  => '♠', // spade
+				'\#9827' => '♣',  'clubs'   => '♣', // club
+				'\#9829' => '♥',  'hearts'  => '♥', // heart
+				'\#9830' => '♦',  'diams'   => '♦' // diamond
+			];
+		}
+		/**
+		 * @function stripHTML
+		 * @static
+		 * @declaration static function stripHTML( string html )
+		 * @brief Strip the HTML from a given string
+		 * @description This function will convert various entities to plain text versions, remove tags and replaces line breaks with new lines.
+		 * @param string html The string to strip
+		 * @return A stripped string
+		 */
+		static function stripHTML( string html ) {
+			string result = .stripTags(html);
+			if( result != html ) {
+				for( number i = 0; i < .entities.size(); i++ ) {
+					object regex = new Regexp("(&" + .entities.getName(i) + ";)", "igx");
+					result = regex.replaceAll(result, .entities[i]);
+				}
+			}
+			return result;
+		}
+
+		static function stripTags( string html ) {
+			string emailAddress = '(([A-Za-z0-9]+)\.?)+@(([A-Za-z0-9]+)\.?)+';
+			object capture_email = new Regexp("<($emailAddress)>");
+			object strip_comment = new Regexp("<!--.*?-->", 's');
+			object strip_tag = new Regexp("</?.*?>", 's');
+			object compress_whitespace = new Regexp('[ \t]+');
+			object br_replace = new Regexp("<br */?>", "gi");
+
+			html = Regexp.replaceAll("\r?\n", html, '');
+			html = br_replace.replaceAll(html, "\n");
+			html = capture_email.replaceAll(html, '\1');
+			html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
+
+			return html;
+		}
+	}
+	/**
+	 * @end
+	 */
 }
 /**
  * @end
