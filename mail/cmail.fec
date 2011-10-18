@@ -1717,15 +1717,24 @@ namespace modifies Mail {
 		static function stripTags( string html ) {
 			string emailAddress = '(([A-Za-z0-9]+)\.?)+@(([A-Za-z0-9]+)\.?)+';
 			object capture_email = new Regexp("<($emailAddress)>");
+			object strip_title_tag = new Regexp('<title>.*?</title>', 'si');
+			object strip_style_tag = new Regexp('<style.*?>.*?</style>', 'si');
 			object strip_comment = new Regexp("<!--.*?-->", 's');
 			object strip_tag = new Regexp("</?.*?>", 's');
 			object compress_whitespace = new Regexp('[ \t]+');
 			object br_replace = new Regexp("<br */?>", "gi");
+			object p_replace = new Regexp("</?p>", "gi");
 
-			html = Regexp.replaceAll("\r?\n", html, '');
+			html = Regexp.replaceAll("\r\n|\r|\n", html, '');
 			html = br_replace.replaceAll(html, "\n");
+			html = p_replace.replaceAll(html, "\n\n");
 			html = capture_email.replaceAll(html, '\1');
-			html = String.trim(compress_whitespace.replaceAll(strip_comment.replaceAll(strip_tag.replaceAll(html, ' '), ' '), ' '), "\r\n\t ");
+			html = strip_title_tag.replaceAll(html, ' ');
+			html = strip_style_tag.replaceAll(html, ' ');
+			html = strip_tag.replaceAll(html, ' ');
+			html = strip_comment.replaceAll(html, ' ');
+			html = compress_whitespace.replaceAll(html, ' ');
+			html = String.trim(html, "\r\n\t ");
 
 			return html;
 		}
