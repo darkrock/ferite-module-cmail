@@ -1723,16 +1723,22 @@ namespace modifies Mail {
 			object strip_tag = new Regexp("</?.*?>", 's');
 			object compress_whitespace = new Regexp('[ \t]+');
 			object br_replace = new Regexp("<br */?>", "gi");
-			object p_replace = new Regexp("</?p>", "gi");
+			object p_replace = new Regexp("</p>", "gi");
+			object div_replace = new Regexp("</div>", "gi");
+			object h_replace = new Regexp("</h[1-9]>", "gi");
+			object tr_replace = new Regexp("</tr>", "gi");
 
 			html = Regexp.replaceAll("\r\n|\r|\n", html, '');
+			html = strip_comment.replaceAll(html, ' ');
 			html = br_replace.replaceAll(html, "\n");
+			html = div_replace.replaceAll(html, "\n");
 			html = p_replace.replaceAll(html, "\n\n");
+			html = h_replace.replaceAll(html, "\n");
+			html = tr_replace.replaceAll(html, "\n");
 			html = capture_email.replaceAll(html, '\1');
 			html = strip_title_tag.replaceAll(html, ' ');
 			html = strip_style_tag.replaceAll(html, ' ');
 			html = strip_tag.replaceAll(html, ' ');
-			html = strip_comment.replaceAll(html, ' ');
 			html = compress_whitespace.replaceAll(html, ' ');
 			html = String.trim(html, "\r\n\t ");
 
