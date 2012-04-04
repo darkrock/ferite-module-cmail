@@ -1455,7 +1455,8 @@ namespace modifies Mail {
 			.entities = [
 				'\#34'   => '"',  'quot'   => '"',  // quotation mark
 				'\#39'   => '\'', 'apos'   => '\'', // apostrophe
-				'\#38'   => '',   'amp'    => '&',  // ampersand
+				'\#38'   => '&',  'amp'    => '&',  // ampersand
+				'\#43'   => '+',                    // plus
 				'\#60'   => '<',  'lt'     => '<',  // less-than
 				'\#62'   => '>',  'gt'     => '>',  // greater-than
 				'\#160'  => ' ',  'nbsp'   => ' ',  // non-breaking space
