@@ -309,7 +309,9 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 					}
 					param=param->next;
 				}
-			} else {
+			}
+			/* If filename was not found in Content-Disposition header search for it among the parameters */
+			if( strcmp(VAS(ferite_object_get_var(script, VAO(object), "filename"))->data, "") == 0 ) {
 				param = body->parameter;
 				while(param){
 					if( param->attribute && ((strcasecmp(param->attribute,"filename") == 0) || 
