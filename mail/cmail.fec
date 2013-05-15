@@ -231,7 +231,7 @@ namespace modifies Mail {
 			if( charset != .defaultEncodingTarget ) {
 				real_str = .convertToDefaultEncodingFrom( str, charset );
 			}
-			real_str.utf8Blocks(10).each() using ( block ) {
+			real_str.utf8Blocks(1).each() using ( block ) {
 				enc_str += Mail.Connection.bit8( block );
 			};		
 		    enc_str = Regexp.replaceAll( '\ ', enc_str, '_' );
