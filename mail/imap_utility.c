@@ -551,11 +551,19 @@ ENVELOPE *create_imap_envelope( FeriteScript *script, FeriteVariable *header ){
 	if(a)
 		env->bcc = a;
 
-	v = ferite_hash_get( script, VAO(header)->variables->variables, "from" );
-	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find create return path");
-	a = create_imap_address( script, v );
-	if(a)
-		env->return_path = a;
+	v = ferite_hash_get( script, VAO(header)->variables->variables, "return_path" );
+	if(v) {
+		a = create_imap_address( script, v );
+		if(a)
+			env->return_path = a;
+	}
+	if(env->return_path == NULL) {
+		v = ferite_hash_get( script, VAO(header)->variables->variables, "from" );
+		ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find create return path");
+		a = create_imap_address( script, v );
+		if(a)
+			env->return_path = a;
+	}
 
 	v = ferite_hash_get( script, VAO(header)->variables->variables, "sender" );
 	ERROR_IF_NULL(v, script, "Unable to create imap envelope - unable to find sender");

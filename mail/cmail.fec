@@ -1029,6 +1029,12 @@ namespace modifies Mail {
 	 */
 	class MessageHeader {
 		/**
+		 * @variable return_path
+		 * @type     Mail.AddressList
+		 * @brief    An array containing a single Mail.Address that is the email's return path
+		 */
+		object return_path;
+		/**
 		 * @variable to
 		 * @type     Mail.AddressList
 		 * @brief    The list of people the email was/should be sent to.
@@ -1097,6 +1103,7 @@ namespace modifies Mail {
 		string subject;
 
 		function constructor(){
+			self.return_path = new Mail.AddressList();
 			self.to = new Mail.AddressList();
 			self.from = new Mail.AddressList();
 			self.bcc = new Mail.AddressList();
@@ -1106,6 +1113,7 @@ namespace modifies Mail {
 		}
 		function duplicate() {
 			object o = new Mail.MessageHeader();
+			o.return_path = .return_path.duplicate();
 			o.from = .from.duplicate();
 			o.sender = .sender.duplicate();
 			o.to = .to.duplicate();
@@ -1120,6 +1128,7 @@ namespace modifies Mail {
 			return o;
 		}
 		function checkEncoding() {
+			.return_path.checkEncoding();
 			.from.checkEncoding();
 			.sender.checkEncoding();
 			.to.checkEncoding();
