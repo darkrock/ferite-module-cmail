@@ -2,7 +2,7 @@
 
 #include "imap_utility.h"
 
-char *strndup( char *buf, size_t len ) {
+char *cmail_strndup( char *buf, size_t len ) {
 	char *nbuf = calloc( len + 1, sizeof(char) );
 	memcpy( nbuf, buf, len );
 	return nbuf;
@@ -14,7 +14,7 @@ FeriteVariable *strip_tags(FeriteScript *script, char *rbuf, int len)
 	int state = 0;
 	FeriteVariable *str;
 
-	buf = (char *)strndup(rbuf, len);
+	buf = (char *)cmail_strndup(rbuf, len);
 	c = *buf;
 	lc = '\0';
 	p = buf;
