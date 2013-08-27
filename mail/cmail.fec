@@ -1804,11 +1804,9 @@ namespace modifies Mail {
 		 */
 		static function stripHTML( string html ) {
 			string result = .stripTags(html);
-			if( result != html ) {
-				for( number i = 0; i < .entities.size(); i++ ) {
-					object regex = new Regexp("(&" + .entities.getName(i) + ";)", "igx");
-					result = regex.replaceAll(result, .entities[i]);
-				}
+			for( number i = 0; i < .entities.size(); i++ ) {
+				object regex = new Regexp("(&" + .entities.getName(i) + ";)", "igx");
+				result = regex.replaceAll(result, .entities[i]);
 			}
 			return result;
 		}
