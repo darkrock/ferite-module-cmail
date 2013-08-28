@@ -1078,6 +1078,12 @@ namespace modifies Mail {
 		 */
 		string ID;
 		/**
+		 * @variable references
+		 * @type     string
+		 * @brief    One or more IDs separated by spaces this message references.
+		 */
+		string references;
+		/**
 		 * @variable in_reply_to
 		 * @type     string
 		 * @brief    The ID the email is in reply to. Allows the tracking of threads.
@@ -1121,6 +1127,7 @@ namespace modifies Mail {
 			o.bcc = .bcc.duplicate();
 			o.reply_to = .reply_to.duplicate();
 			o.ID = .ID;
+			o.references = .references;
 			o.in_reply_to = .in_reply_to;
 			o.date = .date;
 			o.recieved = .recieved;

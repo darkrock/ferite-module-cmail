@@ -140,9 +140,9 @@ FeriteVariable *create_ferite_header_object( FeriteScript *script, ENVELOPE *env
     char *address_target[6] = { "from", "reply_to" , "cc", "bcc", "sender" , "to" };
     int n_address_source = 6;
 
-    char *source[4] = { env->subject, env->date, env->message_id, env->in_reply_to };
-    char *target[4] = { "subject", "date", "ID", "in_reply_to" };
-    int  n_source = 4;
+    char *source[5] = { env->subject, env->date, env->message_id, env->in_reply_to, env->references };
+    char *target[5] = { "subject", "date", "ID", "in_reply_to", "references" };
+    int  n_source = 5;
 
     nsb = ferite_find_namespace( script, script->mainns, "Mail.MessageHeader", FENS_CLS );
     if( nsb == NULL)
