@@ -937,8 +937,13 @@ namespace modifies Mail {
 		 * @brief The name of the user. This function will make sure that the name is fixed and converted into plain text	
 		 * @return The name of the user
 		 */
-		function flatName()
-			return Mail.decodeISOString(.name);
+		function flatName() {
+			if( Mail.canDecodeISOString(.name) )
+				return Mail.decodeISOString(.name);
+			if( not .name.isUTF8() )
+				return Mail.convertToDefaultEncodingFrom(.name, '');
+			return .name;
+		}
 		/**
 		 * @function flatAddress
 		 * @declaration function flatAddress()
@@ -1445,7 +1450,16 @@ namespace modifies Mail {
 		 */
 		function fileName() {
 			if( .isAttachment() ) {
-				string actual_name = Mail.decodeISOString(.filename);
+				string actual_name;
+				if( Mail.canDecodeISOString(.filename) ) {
+					actual_name = Mail.decodeISOString(.filename);
+				} else {
+					if( not .filename.isUTF8() ) {
+						actual_name = Mail.convertToDefaultEncodingFrom(.filename, '');
+					} else {
+						actual_name = .filename;
+					}
+				}
 				if( File.name(actual_name) ){
 					actual_name = File.name(actual_name);
 				}
