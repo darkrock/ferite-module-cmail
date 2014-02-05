@@ -176,18 +176,22 @@ namespace modifies Mail {
 
 		str = Regexp.replaceAll( '\n', str, '' );
 		if( o.match( str ) ) {
+			string charset;
 			str = Regexp.replaceAll( ' ', str, '' );
 			str = Regexp.replaceAll( '_', str, ' ' );
 			o.matchAll( str ) using ( match ) {
 				if( match.span()[0] != currentIndex )
 					nstr += str[currentIndex..(match.span()[0]-1)];
 
+				if( not charset )
+					charset = match.capture(0);
+
 				if( String.compareNoCase(match.capture(1), "q") )
-					nstr += .convertToDefaultEncodingFrom(Mail.Connection.qprint( match.capture(2) ), match.capture(0));
+					nstr += Mail.Connection.qprint( match.capture(2) );
 				else if( String.compareNoCase( match.capture(1), "b") )
-					nstr += .convertToDefaultEncodingFrom(Mail.Connection.base64( match.capture(2) ), match.capture(0));
+					nstr += Mail.Connection.base64( match.capture(2) );
 				else
-					nstr += .convertToDefaultEncodingFrom(match.capture(2), match,capture(0));
+					nstr += match.capture(2);
 
 				currentIndex = match.span()[1];
 			};
@@ -195,7 +199,7 @@ namespace modifies Mail {
 			if( currentIndex < String.length(str) )
 				nstr += str[currentIndex..];
 
-			return nstr;
+			return .convertToDefaultEncodingFrom(nstr, charset);
 		}
 		else if( o2.match( str ) ) {
 			object match = null;
@@ -796,8 +800,14 @@ namespace modifies Mail {
 			if( subject ){
 				if( Mail.canDecodeISOString(subject) ) {
 					subject = Mail.decodeISOString(subject);
-				} else if( .content ) {
-					subject = Mail.convertToDefaultEncodingFrom( subject, .guessMainCharacterSet() );
+				} else {
+					if( not subject.isUTF8() ) {
+						if( .content ) {
+							subject = Mail.convertToDefaultEncodingFrom( subject, .guessMainCharacterSet() );
+						} else {
+							subject = Mail.convertToDefaultEncodingFrom( subject, '' );
+						}
+					}
 				}
 			}
 			return subject;
