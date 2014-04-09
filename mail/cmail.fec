@@ -119,7 +119,11 @@ namespace modifies Mail {
 			type = .defaultEncodingSource;
 		}
 
-		if( not type ) {
+		if( type == 'IBM01142' ) {
+			type = 'CP01142';
+		}
+
+		if( not type or type.toLower() == 'x-unknown' ) {
 			Mail.output(Mail.OUTPUT_NORMAL,"module.mail: No charset requested, defaulting to ${.defaultEncodingSource}");
 			type = .defaultEncodingSource;
 		}
@@ -127,7 +131,14 @@ namespace modifies Mail {
 		monitor {
 			convertor = new iconv.Convertor(Mail.defaultEncodingTarget, type);
 		} handle {
-			convertor = null; //no convertion beacasue we have no convertor..... :/
+			Mail.output(Mail.OUTPUT_WARNING,"Could not create converter from $type to ${Mail.defaultEncodingTarget}, attempting convert from ${.defaultEncodingSource}");
+			type = .defaultEncodingSource;
+			monitor {
+				convertor = new iconv.Convertor(Mail.defaultEncodingTarget, type);
+			} handle {
+				Mail.output(Mail.OUTPUT_ERROR,"Could not create converter from $type to ${Mail.defaultEncodingTarget}");
+				convertor = null; //no convertion beacasue we have no convertor..... :/
+			}
 		}
 		
 		if( not (.requestedTypeIsTarget(type)) and convertor ) {
