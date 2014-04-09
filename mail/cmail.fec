@@ -596,7 +596,7 @@ namespace modifies Mail {
 			// Swap out the old header
 			mail.header = new_header;
 
-			server = _server + (ssl ? "/ssl/novalidate-cert" : "/novalidate-cert/notls") + (username ? "/authuser=$username" : "");
+			server = _server + (ssl ? "/ssl/novalidate-cert" : "/novalidate-cert") + (username ? "/user=$username" : "");
 
 			result = .__sendMessage( server, password, mail );
 			// Bring back the old header
@@ -609,6 +609,8 @@ namespace modifies Mail {
 			BODY *body = NULL;
 			SENDSTREAM *stream = NULL;
 			char *hostlist[] = { server->data, NIL };
+
+#include "imap/linkage.c"
 
 			// Set the password
 			global_pwd = password->data;
