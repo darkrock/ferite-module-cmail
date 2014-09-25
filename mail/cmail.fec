@@ -645,7 +645,7 @@ namespace modifies Mail {
 				FE_RETURN_FALSE;
 			}
 
-			stream = smtp_open( hostlist, FE_FALSE); //SOP_TRYSSL
+			stream = smtp_open( hostlist, FE_TRUE); //SOP_TRYSSL
 			
 			if( stream == NULL ) {
 				set_error_string( script, self,"Error opening SMTP stream" );
