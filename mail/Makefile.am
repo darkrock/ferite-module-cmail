@@ -44,7 +44,7 @@ cmail_la_SOURCES    = \
 	imap_utility.h \
 	tingeling.c
 cmail_la_LDFLAGS    = -no-undefined -module -avoid-version
-cmail_la_LIBADD     = -lc-client -lcrypto @gss@
+cmail_la_LIBADD     = -lc-client -lssl -lcrypto @gss@
 
 cmail_core.c: @MODULE_SRC_PREFIX@/mail/cmail.fec
 	@BUILDER@ -m cmail @MODULE_SRC_PREFIX@/mail/cmail.fec
