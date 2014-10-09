@@ -722,6 +722,37 @@ namespace modifies Mail {
 		    }
 		    FE_RETURN_FALSE;
 		}
+
+		function setupSSLCert(string &_server, string username, string password, boolean ssl){
+			_server = _server + (ssl ? "/ssl/novalidate-cert" : "/novalidate-cert/notls") + (username ? "/authuser=$username" : "");
+		}
+
+        native function getServerMaxMailSize(string server ) {
+            SENDSTREAM *stream = NULL;
+            NETMBX networkMailbox;
+            char *hostlist[] = { server->data, NIL };
+            long maxMailSize = -1;
+
+			memset(&networkMailbox, '\0', sizeof(networkMailbox));
+			stream = smtp_open( hostlist, FE_FALSE); 
+            if( stream == NULL ) {
+                set_error_string( script, self,"Error opening SMTP stream" );
+                FE_RETURN_LONG( -2 );
+            }
+
+            smtp_ehlo( stream, "localhost", &networkMailbox );
+
+            if(stream->protocol.esmtp.size.ok){
+                maxMailSize = stream->protocol.esmtp.size.limit;
+            }
+			else{
+				maxMailSize = -3;
+			}
+
+            smtp_close( stream );
+
+            FE_RETURN_LONG( maxMailSize );
+        }
 	}
 	/**
 	 * @end
