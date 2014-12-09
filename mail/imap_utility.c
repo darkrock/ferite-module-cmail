@@ -285,7 +285,7 @@ FeriteVariable *create_ferite_content_object( FeriteScript *script, MAILSTREAM *
 					ptr = ptr->next;
 				}
 			}
-			v = fe_new_str("content", buf2, len2, FE_CHARSET_DEFAULT );
+			v = fe_new_bin_str("content", buf2, len2, FE_CHARSET_DEFAULT );
 			ferite_object_set_var(script, VAO(object), "content", v );
 
 			v = fe_new_lng("encoding", body->encoding );
