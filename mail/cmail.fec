@@ -163,7 +163,7 @@ namespace modifies Mail {
 	 * @return true if the string can be fixed, false otherwise
 	 */
 	function canDecodeISOString( string str ) {
-		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
+		object o = new Regexp( '[=?]+(iso-.*?|utf-8|koi8-r|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 
 		str = Regexp.replaceAll( '\n', str, '' );
@@ -181,7 +181,7 @@ namespace modifies Mail {
 	 */
 	function decodeISOString( string str ) {
 		string nstr;
-		object o = new Regexp( '[=?]+(iso-.*?|utf-8|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
+		object o = new Regexp( '[=?]+(iso-.*?|utf-8|koi8-r|windows-.*?|x-unknown|us-ascii)[?](.)[?](.*?)\?=', "i" );
 		object o2 = new Regexp( '(iso-.*?)[\']{2}(.*)', "i" );
 		number currentIndex = 0;
 
