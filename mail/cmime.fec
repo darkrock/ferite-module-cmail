@@ -97,6 +97,16 @@ namespace modifies Mail {
 				default: return "";
 			}
 		}
+		function fromString( string type ) {
+			switch( type.toLower() ) {
+				case 'text':        return Mail.Mime.TYPETEXT;
+				case 'application': return Mail.Mime.TYPEAPPLICATION;
+				case 'audio':       return Mail.Mime.TYPEAUDIO;
+				case 'image':       return Mail.Mime.TYPEIMAGE;
+				case 'video':       return Mail.Mime.TYPEVIDEO;
+				default:            return Mail.Mime.TYPEOTHER;
+			}
+		}
 	}
 	/**
 	 * @end
