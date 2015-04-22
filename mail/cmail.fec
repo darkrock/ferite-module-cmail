@@ -574,7 +574,7 @@ namespace modifies Mail {
 		 * @return true on success, fales otherwise
 		 */
 		function sendMessage( string server, object mail ) {
-			return .sendMessage( server, '', '', false, mail );
+			return .sendMessage( server, '', '', false, false, mail );
 		}
 		/**
 		 * @function sendMessage
@@ -587,10 +587,11 @@ namespace modifies Mail {
 		 * @param string usernane The username to use, leave blank if you do not want authentication
 		 * @param string password The password to use with the username name, leave blank if you do not want authentication
 		 * @param boolean ssl Whether the connection should be done over SSL, false if SSL is not desired
+		 * @param boolean tls Whether the connection should be done over TLS, false if TLS is not desired
 		 * @param object mail The Mail.Message object to send
 		 * @return true on success, false otherwise
 		 */
-		function sendMessage( string _server, string username, string password, boolean ssl, object mail ) {
+		function sendMessage( string _server, string username, string password, boolean ssl, boolean tls, object mail ) {
 			object old_header = mail.header;
 			object new_header = old_header.duplicate();
 			string new_subject = Mail.encodeISOString(Mail.truncateHeaderLine(Regexp.replaceAll('[\r\n]', old_header.subject, ' '), String.length("Subject: ")));
@@ -607,7 +608,11 @@ namespace modifies Mail {
 			// Swap out the old header
 			mail.header = new_header;
 
-			server = _server + (ssl ? "/ssl/novalidate-cert" : "/novalidate-cert") + (username ? "/user=$username" : "");
+			     if( ssl ) server += "/ssl/novalidate-cert";
+			else if( tls ) server += "/tls/novalidate-cert";
+			else           server += "/novalidate-cert";
+
+			if( username ) server += "/user=$username";
 
 			result = .__sendMessage( server, password, mail );
 			// Bring back the old header
@@ -645,7 +650,7 @@ namespace modifies Mail {
 				FE_RETURN_FALSE;
 			}
 
-			stream = smtp_open( hostlist, FE_TRUE); //SOP_TRYSSL
+			stream = smtp_open( hostlist, OP_DEBUG ); // SOP_TRYSSL
 			
 			if( stream == NULL ) {
 				set_error_string( script, self,"Error opening SMTP stream" );
