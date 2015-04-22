@@ -1004,9 +1004,12 @@ namespace modifies Mail {
 		 * @brief The combined email address as a string
 		 * @return See the brief.
 		 */
-		function flatAddress()
-			return "${.mailbox}@${.host}";
-			
+		function flatAddress() {
+			string mailbox = (.mailbox.isUTF8() ? .mailbox : Mail.convertToDefaultEncodingFrom(.mailbox, ''));
+			string host = (.host.isUTF8() ? .host : Mail.convertToDefaultEncodingFrom(.host, ''));
+			return "${mailbox}@${host}";
+		}
+
 		function duplicate() {
 			object o = new Mail.Address();
 			o.mailbox = .mailbox;
